@@ -1,0 +1,937 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────
+// AUTH / USER MANAGEMENT
+// ─────────────────────────────────────────
+
+enum UserRole {
+  EAGLE_ADMIN
+  OFFICE_STAFF
+  SCHOOL_ADMIN
+  DRIVER
+  PARENT
+  CHARTER_CUSTOMER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  password      String? // hashed
+  role          UserRole  @default(PARENT)
+  isActive      Boolean   @default(true)
+  image         String?
+  phone         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts              Account[]
+  sessions              Session[]
+  parent                Parent?
+  driver                Driver?
+  schoolAdmin           SchoolAdmin[]
+  auditLogs             AuditLog[]
+  sentMessages          Message[]
+  messageDeliveries     MessageDelivery[]
+  attendanceCorrections AttendanceCorrection[]
+  MessageRecipient      MessageRecipient[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─────────────────────────────────────────
+// SCHOOLS
+// ─────────────────────────────────────────
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique // configurable school code for registration
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?
+  phone     String?
+  email     String?
+  website   String?
+  isActive  Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Settings
+  settings   SchoolSettings?
+  contacts   SchoolContact[]
+  adminUsers SchoolAdmin[]
+
+  // Relations
+  students      Student[]
+  registrations Registration[]
+  routes        Route[]
+  charterTrips  CharterTrip[]
+  invoices      Invoice[]
+  messages      Message[]
+  incidents     Incident[]
+  portalInvites SchoolPortalInvite[]
+
+  @@map("schools")
+}
+
+model SchoolSettings {
+  id                   String  @id @default(cuid())
+  schoolId             String  @unique
+  amRate               Decimal @default(0) @db.Decimal(10, 2)
+  pmRate               Decimal @default(0) @db.Decimal(10, 2)
+  amPmRate             Decimal @default(0) @db.Decimal(10, 2)
+  siblingDiscount      Decimal @default(0) @db.Decimal(5, 2) // percentage
+  maxCapacityPerBus    Int     @default(60)
+  requiresSchoolCode   Boolean @default(true)
+  allowWaitlist        Boolean @default(true)
+  registrationOpen     Boolean @default(true)
+  quickbooksCustomerId String?
+  notifyOnRegistration Boolean @default(true)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("school_settings")
+}
+
+model SchoolContact {
+  id        String  @id @default(cuid())
+  schoolId  String
+  name      String
+  title     String?
+  email     String?
+  phone     String?
+  isPrimary Boolean @default(false)
+  isBilling Boolean @default(false)
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("school_contacts")
+}
+
+model SchoolAdmin {
+  id       String @id @default(cuid())
+  userId   String
+  schoolId String
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, schoolId])
+  @@map("school_admins")
+}
+
+model SchoolPortalInvite {
+  id        String    @id @default(cuid())
+  schoolId  String
+  email     String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@map("school_portal_invites")
+}
+
+// ─────────────────────────────────────────
+// PARENTS & STUDENTS
+// ─────────────────────────────────────────
+
+model Parent {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  firstName        String
+  lastName         String
+  email            String
+  phone1           String?
+  phone2           String?
+  address          String?
+  city             String?
+  state            String?
+  zipCode          String?
+  isActive         Boolean  @default(true)
+  stripeCustomerId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students Student[]
+  payments Payment[]
+  invoices Invoice[]
+  messages MessageRecipient[]
+
+  @@map("parents")
+}
+
+model Student {
+  id           String    @id @default(cuid())
+  parentId     String
+  schoolId     String
+  firstName    String
+  lastName     String
+  studentIdExt String? // External student ID (Traversa)
+  grade        String?
+  gender       String?
+  dateOfBirth  DateTime?
+  medicalNotes String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  parent            Parent             @relation(fields: [parentId], references: [id])
+  school            School             @relation(fields: [schoolId], references: [id])
+  registrations     Registration[]
+  attendances       Attendance[]
+  incidents         Incident[]
+  emergencyContacts EmergencyContact[]
+
+  @@map("students")
+}
+
+model EmergencyContact {
+  id           String  @id @default(cuid())
+  studentId    String
+  name         String
+  relationship String
+  phone        String
+  email        String?
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("emergency_contacts")
+}
+
+// ─────────────────────────────────────────
+// REGISTRATIONS
+// ─────────────────────────────────────────
+
+enum RegistrationStatus {
+  PENDING_REVIEW
+  APPROVED
+  WAITLISTED
+  REJECTED
+  CANCELLED
+}
+
+enum ServiceType {
+  AM_ONLY
+  PM_ONLY
+  AM_AND_PM
+}
+
+enum PaymentStatus {
+  PENDING_PAYMENT
+  PAID_ACTIVE
+  WAITLISTED
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+model Registration {
+  id            String             @id @default(cuid())
+  studentId     String
+  schoolId      String
+  schoolCode    String
+  serviceType   ServiceType
+  status        RegistrationStatus @default(PENDING_REVIEW)
+  paymentStatus PaymentStatus      @default(PENDING_PAYMENT)
+  notes         String?
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  submittedAt   DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  student         Student          @relation(fields: [studentId], references: [id])
+  school          School           @relation(fields: [schoolId], references: [id])
+  routeAssignment RouteAssignment?
+  invoices        Invoice[]
+  payments        Payment[]
+
+  @@map("registrations")
+}
+
+// ─────────────────────────────────────────
+// ROUTES, BUSES & DRIVERS
+// ─────────────────────────────────────────
+
+enum RunType {
+  AM
+  PM
+}
+
+model Route {
+  id          String   @id @default(cuid())
+  schoolId    String?
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school School? @relation(fields: [schoolId], references: [id])
+  runs   Run[]
+
+  @@map("routes")
+}
+
+model Run {
+  id        String   @id @default(cuid())
+  routeId   String
+  type      RunType
+  name      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  route            Route             @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  stops            Stop[]
+  driverAssignment DriverAssignment?
+  attendances      Attendance[]
+
+  @@map("runs")
+}
+
+model Stop {
+  id            String  @id @default(cuid())
+  runId         String
+  name          String
+  address       String
+  sequence      Int
+  estimatedTime String?
+
+  run              Run               @relation(fields: [runId], references: [id], onDelete: Cascade)
+  routeAssignments RouteAssignment[]
+
+  @@map("stops")
+}
+
+model RouteAssignment {
+  id             String   @id @default(cuid())
+  registrationId String   @unique
+  stopId         String
+  assignedAt     DateTime @default(now())
+  assignedBy     String?
+  isActive       Boolean  @default(true)
+  notes          String?
+
+  registration Registration @relation(fields: [registrationId], references: [id])
+  stop         Stop         @relation(fields: [stopId], references: [id])
+
+  @@map("route_assignments")
+}
+
+model Bus {
+  id           String   @id @default(cuid())
+  busNumber    String   @unique
+  make         String?
+  model        String?
+  year         Int?
+  capacity     Int      @default(60)
+  licensePlate String?
+  vin          String?
+  isActive     Boolean  @default(true)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  driverAssignments DriverAssignment[]
+  tripAssignments   TripAssignment[]
+
+  @@map("buses")
+}
+
+model Driver {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  firstName  String
+  lastName   String
+  email      String
+  phone      String?
+  licenseNo  String?
+  licenseExp DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user            User               @relation(fields: [userId], references: [id])
+  assignments     DriverAssignment[]
+  attendances     Attendance[]
+  tripAssignments TripAssignment[]
+  incidents       Incident[]
+
+  @@map("drivers")
+}
+
+model DriverAssignment {
+  id         String   @id @default(cuid())
+  driverId   String
+  runId      String   @unique
+  busId      String?
+  assignedAt DateTime @default(now())
+  isActive   Boolean  @default(true)
+
+  driver Driver @relation(fields: [driverId], references: [id])
+  run    Run    @relation(fields: [runId], references: [id])
+  bus    Bus?   @relation(fields: [busId], references: [id])
+
+  @@map("driver_assignments")
+}
+
+// ─────────────────────────────────────────
+// ATTENDANCE
+// ─────────────────────────────────────────
+
+enum AttendanceStatus {
+  BOARDED
+  DROPPED_OFF
+  ABSENT
+  EXCUSED
+}
+
+model Attendance {
+  id        String           @id @default(cuid())
+  studentId String
+  runId     String
+  driverId  String
+  date      DateTime         @db.Date
+  runType   RunType
+  status    AttendanceStatus
+  boardedAt DateTime?
+  droppedAt DateTime?
+  notes     String?
+  createdAt DateTime         @default(now())
+
+  student     Student                @relation(fields: [studentId], references: [id])
+  run         Run                    @relation(fields: [runId], references: [id])
+  driver      Driver                 @relation(fields: [driverId], references: [id])
+  corrections AttendanceCorrection[]
+
+  @@unique([studentId, runId, date, runType])
+  @@map("attendance")
+}
+
+model AttendanceCorrection {
+  id           String           @id @default(cuid())
+  attendanceId String
+  correctedBy  String
+  oldStatus    AttendanceStatus
+  newStatus    AttendanceStatus
+  reason       String
+  createdAt    DateTime         @default(now())
+
+  attendance      Attendance @relation(fields: [attendanceId], references: [id])
+  correctedByUser User       @relation(fields: [correctedBy], references: [id])
+
+  @@map("attendance_corrections")
+}
+
+// ─────────────────────────────────────────
+// INCIDENTS / REFERRALS
+// ─────────────────────────────────────────
+
+enum IncidentStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ACTION_TAKEN
+  NOTIFIED
+  RESOLVED
+  CLOSED
+}
+
+model Incident {
+  id            String         @id @default(cuid())
+  studentId     String?
+  schoolId      String?
+  driverId      String
+  routeInfo     String?
+  date          DateTime
+  incidentType  String
+  description   String         @db.Text
+  officeAction  String?        @db.Text
+  internalNotes String?        @db.Text
+  status        IncidentStatus @default(SUBMITTED)
+  resolvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  student        Student?                @relation(fields: [studentId], references: [id])
+  school         School?                 @relation(fields: [schoolId], references: [id])
+  driver         Driver                  @relation(fields: [driverId], references: [id])
+  communications IncidentCommunication[]
+
+  @@map("incidents")
+}
+
+model IncidentCommunication {
+  id         String   @id @default(cuid())
+  incidentId String
+  sentTo     String // 'parent' | 'school' | 'internal'
+  method     String // 'email' | 'sms' | 'phone'
+  message    String   @db.Text
+  sentAt     DateTime @default(now())
+  sentBy     String?
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@map("incident_communications")
+}
+
+// ─────────────────────────────────────────
+// CHARTER / FIELD TRIPS
+// ─────────────────────────────────────────
+
+enum CharterTripStatus {
+  NEW
+  REVIEWING
+  QUOTED
+  APPROVED
+  INVOICED
+  PAID
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model CharterTrip {
+  id                  String            @id @default(cuid())
+  schoolId            String? // Optional CRM link
+  organizationName    String
+  contactName         String
+  contactEmail        String
+  contactPhone        String?
+  billingName         String
+  billingEmail        String
+  billingPhone        String?
+  billingAddress      String?
+  tripDate            DateTime
+  pickupAddress       String
+  stagingTime         DateTime?
+  destinationName     String
+  destinationAddress  String
+  returnStagingTime   DateTime?
+  returnArrivalTime   DateTime?
+  overnightReturnDate DateTime?
+  tripType            String
+  eventType           String?
+  numberOfBuses       Int               @default(1)
+  numberOfStudents    Int
+  numberOfChaperones  Int?
+  gradeLevel          String?
+  ageRange            String?
+  teacherName         String?
+  teacherPhone        String?
+  teacherEmail        String?
+  specialInstructions String?           @db.Text
+  status              CharterTripStatus @default(NEW)
+  calendarEventId     String? // Google Calendar event ID
+  quickbooksInvoiceId String?
+  reviewNotes         String?
+  completedAt         DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  school        School?          @relation(fields: [schoolId], references: [id])
+  tripQuote     TripQuote?
+  assignments   TripAssignment[]
+  invoices      Invoice[]
+  documents     TripDocument[]
+  reviewRequest ReviewRequest?
+
+  @@map("charter_trips")
+}
+
+model TripQuote {
+  id         String    @id @default(cuid())
+  tripId     String    @unique
+  amount     Decimal   @db.Decimal(10, 2)
+  notes      String?   @db.Text
+  validUntil DateTime?
+  approvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  trip CharterTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("trip_quotes")
+}
+
+model TripAssignment {
+  id       String  @id @default(cuid())
+  tripId   String
+  busId    String?
+  driverId String?
+  role     String? // 'primary' | 'support'
+  notes    String?
+
+  trip   CharterTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  bus    Bus?        @relation(fields: [busId], references: [id])
+  driver Driver?     @relation(fields: [driverId], references: [id])
+
+  @@map("trip_assignments")
+}
+
+model TripDocument {
+  id         String   @id @default(cuid())
+  tripId     String
+  fileName   String
+  fileUrl    String
+  fileType   String
+  fileSize   Int
+  uploadedAt DateTime @default(now())
+
+  trip CharterTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("trip_documents")
+}
+
+// ─────────────────────────────────────────
+// INVOICES & PAYMENTS
+// ─────────────────────────────────────────
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum InvoiceType {
+  CHARTER
+  PARENT_PAY
+  SCHOOL_CONTRACT
+}
+
+model Invoice {
+  id                    String        @id @default(cuid())
+  invoiceNumber         String        @unique
+  type                  InvoiceType
+  schoolId              String?
+  parentId              String?
+  registrationId        String?
+  charterTripId         String?
+  billingName           String
+  billingEmail          String
+  billingAddress        String?
+  amount                Decimal       @db.Decimal(10, 2)
+  taxAmount             Decimal       @default(0) @db.Decimal(10, 2)
+  totalAmount           Decimal       @db.Decimal(10, 2)
+  status                InvoiceStatus @default(DRAFT)
+  dueDate               DateTime?
+  paidAt                DateTime?
+  quickbooksInvoiceId   String?
+  stripePaymentIntentId String?
+  notes                 String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  school       School?           @relation(fields: [schoolId], references: [id])
+  parent       Parent?           @relation(fields: [parentId], references: [id])
+  registration Registration?     @relation(fields: [registrationId], references: [id])
+  charterTrip  CharterTrip?      @relation(fields: [charterTripId], references: [id])
+  lineItems    InvoiceLineItem[]
+  payments     Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int     @default(1)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_line_items")
+}
+
+model Payment {
+  id               String   @id @default(cuid())
+  invoiceId        String?
+  registrationId   String?
+  parentId         String?
+  amount           Decimal  @db.Decimal(10, 2)
+  method           String // 'stripe' | 'check' | 'cash' | 'ach'
+  status           String // 'succeeded' | 'pending' | 'failed' | 'refunded'
+  stripePaymentId  String?
+  stripeCustomerId String?
+  reference        String?
+  notes            String?
+  paidAt           DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id])
+  registration Registration? @relation(fields: [registrationId], references: [id])
+  parent       Parent?       @relation(fields: [parentId], references: [id])
+  receipts     Receipt[]
+  credits      Credit[]
+
+  @@map("payments")
+}
+
+model Receipt {
+  id        String    @id @default(cuid())
+  paymentId String
+  emailSent Boolean   @default(false)
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@map("receipts")
+}
+
+model Credit {
+  id        String   @id @default(cuid())
+  paymentId String?
+  amount    Decimal  @db.Decimal(10, 2)
+  reason    String
+  appliedTo String? // invoice ID
+  createdBy String
+  createdAt DateTime @default(now())
+
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@map("credits")
+}
+
+// ─────────────────────────────────────────
+// MESSAGING
+// ─────────────────────────────────────────
+
+enum MessageTargetType {
+  ALL
+  SCHOOL
+  BUS
+  ROUTE
+  RUN
+  STOP
+  INDIVIDUAL
+  DRIVERS
+  PAYMENT_STATUS
+}
+
+model Message {
+  id          String            @id @default(cuid())
+  senderId    String
+  schoolId    String?
+  subject     String?
+  body        String            @db.Text
+  targetType  MessageTargetType
+  targetId    String? // schoolId, busId, routeId, etc.
+  targetValue String? // payment status filter value
+  channels    String[] // ['sms', 'email']
+  sentAt      DateTime          @default(now())
+  createdAt   DateTime          @default(now())
+
+  sender     User               @relation(fields: [senderId], references: [id])
+  school     School?            @relation(fields: [schoolId], references: [id])
+  recipients MessageRecipient[]
+
+  @@map("messages")
+}
+
+model MessageRecipient {
+  id        String  @id @default(cuid())
+  messageId String
+  userId    String?
+  parentId  String?
+  email     String?
+  phone     String?
+  name      String?
+
+  message    Message           @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user       User?             @relation(fields: [userId], references: [id])
+  parent     Parent?           @relation(fields: [parentId], references: [id])
+  deliveries MessageDelivery[]
+
+  @@map("message_recipients")
+}
+
+model MessageDelivery {
+  id          String    @id @default(cuid())
+  recipientId String
+  userId      String?
+  channel     String // 'sms' | 'email'
+  status      String // 'sent' | 'delivered' | 'failed' | 'bounced'
+  externalId  String? // Twilio SID or email message ID
+  error       String?
+  deliveredAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  recipient MessageRecipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  user      User?            @relation(fields: [userId], references: [id])
+
+  @@map("message_deliveries")
+}
+
+// ─────────────────────────────────────────
+// INTEGRATIONS
+// ─────────────────────────────────────────
+
+model Integration {
+  id           String    @id @default(cuid())
+  provider     String // 'quickbooks' | 'google_calendar' | 'stripe' | 'twilio'
+  accessToken  String?   @db.Text
+  refreshToken String?   @db.Text
+  expiresAt    DateTime?
+  realmId      String? // QuickBooks company ID
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([provider])
+  @@map("integrations")
+}
+
+// ─────────────────────────────────────────
+// CALENDAR EVENTS
+// ─────────────────────────────────────────
+
+model CalendarEvent {
+  id            String   @id @default(cuid())
+  googleEventId String?  @unique
+  title         String
+  description   String?  @db.Text
+  startDateTime DateTime
+  endDateTime   DateTime
+  location      String?
+  charterTripId String?
+  status        String   @default("confirmed")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("calendar_events")
+}
+
+// ─────────────────────────────────────────
+// REVIEWS
+// ─────────────────────────────────────────
+
+model ReviewRequest {
+  id                 String    @id @default(cuid())
+  charterTripId      String    @unique
+  token              String    @unique
+  rating             Int? // 1-5
+  feedback           String?   @db.Text
+  redirectedToGoogle Boolean   @default(false)
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+
+  charterTrip CharterTrip @relation(fields: [charterTripId], references: [id])
+
+  @@map("review_requests")
+}
+
+// ─────────────────────────────────────────
+// TRAVERSA / CSV ROUTING
+// ─────────────────────────────────────────
+
+model RoutingExport {
+  id          String   @id @default(cuid())
+  schoolId    String?
+  fileName    String
+  exportedAt  DateTime @default(now())
+  exportedBy  String
+  recordCount Int
+  status      String   @default("exported")
+
+  @@map("routing_exports")
+}
+
+model RoutingImport {
+  id          String   @id @default(cuid())
+  schoolId    String?
+  fileName    String
+  importedAt  DateTime @default(now())
+  importedBy  String
+  totalRows   Int
+  successRows Int      @default(0)
+  errorRows   Int      @default(0)
+  errors      Json?
+  status      String   @default("pending")
+
+  @@map("routing_imports")
+}
+
+// ─────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
