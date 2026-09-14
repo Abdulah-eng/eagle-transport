@@ -166,6 +166,7 @@ export default async function SchoolPortalRootPage() {
                     className="w-full py-2.5 bg-primary text-primary-foreground font-bold text-xs rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
                   >
                     Open School Portal <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
               )
             })}
