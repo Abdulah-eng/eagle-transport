@@ -65,14 +65,12 @@ export default async function SchoolInvoicesPage({ params }: { params: Promise<{
             const tripSchool = inv.charterTrip?.schoolId;
             const bName = (inv.billingName || "").toLowerCase();
             const sName = (school?.name || "").toLowerCase();
+            const sCode = (school?.code || "").toLowerCase();
             return (
-              inv.schoolId === activeSchoolId ||
-              inv.schoolId === schoolIdParam ||
-              tripSchool === activeSchoolId ||
-              tripSchool === schoolIdParam ||
-              (sName && bName.includes(sName)) ||
-              bName.includes("lincoln") ||
-              bName.includes("hell")
+              (inv.schoolId && (inv.schoolId === activeSchoolId || inv.schoolId === schoolIdParam)) ||
+              (tripSchool && (tripSchool === activeSchoolId || tripSchool === schoolIdParam)) ||
+              (sName && sName.length > 3 && bName.includes(sName)) ||
+              (sCode && sCode.length > 2 && bName.includes(sCode))
             );
           });
         }

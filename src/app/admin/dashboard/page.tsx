@@ -54,6 +54,43 @@ export default async function AdminDashboardPage() {
     console.error("[ADMIN_DASHBOARD_DB_ERROR]", err);
   }
 
+  // Supabase REST Fallbacks for Admin Dashboard
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const headers = {
+      'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+    };
+
+    if (!recentPublicTrips || recentPublicTrips.length === 0) {
+      try {
+        const tripRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/charter_trips?select=*&order=createdAt.desc&limit=10`, { headers, cache: 'no-store' });
+        if (tripRes.ok) {
+          const rows = await tripRes.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            recentPublicTrips = rows;
+            newCharterTripsCount = rows.filter((r: any) => r.status === "NEW" || r.status === "QUOTED" || r.status === "INVOICED").length;
+          }
+        }
+      } catch (e) {
+        console.error("[ADMIN_DASHBOARD_SUPABASE_TRIPS_ERROR]", e);
+      }
+    }
+
+    if (!schools || schools.length === 0) {
+      try {
+        const schoolRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/schools?select=*,settings:school_settings(*)`, { headers, cache: 'no-store' });
+        if (schoolRes.ok) {
+          const rows = await schoolRes.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            schools = rows;
+          }
+        }
+      } catch (e) {
+        console.error("[ADMIN_DASHBOARD_SUPABASE_SCHOOLS_ERROR]", e);
+      }
+    }
+  }
+
   return (
     <div className="space-y-8 animate-fade-in pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

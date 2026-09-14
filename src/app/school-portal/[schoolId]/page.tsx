@@ -153,14 +153,12 @@ export default async function SchoolDashboardPage({ params }: { params: Promise<
               const tripSchool = inv.charterTrip?.schoolId;
               const bName = (inv.billingName || "").toLowerCase();
               const sName = (school?.name || "").toLowerCase();
+              const sCode = (school?.code || "").toLowerCase();
               return (
-                inv.schoolId === activeSchoolId ||
-                inv.schoolId === schoolIdParam ||
-                tripSchool === activeSchoolId ||
-                tripSchool === schoolIdParam ||
-                (sName && bName.includes(sName)) ||
-                bName.includes("lincoln") ||
-                bName.includes("hell")
+                (inv.schoolId && (inv.schoolId === activeSchoolId || inv.schoolId === schoolIdParam)) ||
+                (tripSchool && (tripSchool === activeSchoolId || tripSchool === schoolIdParam)) ||
+                (sName && sName.length > 3 && bName.includes(sName)) ||
+                (sCode && sCode.length > 2 && bName.includes(sCode))
               );
             });
           }
@@ -185,12 +183,11 @@ export default async function SchoolDashboardPage({ params }: { params: Promise<
             recentTrips = rows.filter((t: any) => {
               const oName = (t.organizationName || "").toLowerCase();
               const sName = (school?.name || "").toLowerCase();
+              const sCode = (school?.code || "").toLowerCase();
               return (
-                t.schoolId === activeSchoolId ||
-                t.schoolId === schoolIdParam ||
-                (sName && oName.includes(sName)) ||
-                oName.includes("lincoln") ||
-                oName.includes("hell")
+                (t.schoolId && (t.schoolId === activeSchoolId || t.schoolId === schoolIdParam)) ||
+                (sName && sName.length > 3 && oName.includes(sName)) ||
+                (sCode && sCode.length > 2 && oName.includes(sCode))
               );
             });
           }
