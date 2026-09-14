@@ -65,10 +65,10 @@ export default async function SchoolPortalLayout({
         </nav>
 
         <div className="p-4 border-t border-border">
-          <Link href="/api/auth/signout" className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-destructive hover:bg-destructive/10">
+          <a href="/api/auth/logout" className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-destructive hover:bg-destructive/10">
             <LogOut className="w-4 h-4" />
             Sign Out
-          </Link>
+          </a>
         </div>
       </aside>
 

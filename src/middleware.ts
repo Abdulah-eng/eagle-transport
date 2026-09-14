@@ -4,7 +4,16 @@ import type { NextRequest } from "next/server";
 import type { UserRole } from "@prisma/client";
 
 // Public routes that don't require auth
-const PUBLIC_ROUTES = ["/", "/intake", "/review", "/auth"];
+const PUBLIC_ROUTES = [
+  "/",
+  "/intake",
+  "/review",
+  "/auth",
+  "/privacy-policy",
+  "/terms-of-service",
+  "/terms",
+  "/rules"
+];
 const AUTH_ROUTES = ["/auth/login", "/auth/register"];
 
 // Role-based route access map
