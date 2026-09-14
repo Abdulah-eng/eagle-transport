@@ -56,14 +56,15 @@ export default function SchoolInvoicesClient({
     }
   }, [invoices]);
 
-  const getQbUrl = (invoice: InvoiceItem) => {
+  // Returns QB direct invoice URL only if qbId is a real Intuit transaction ID (not placeholder "149")
+  const getRealQbUrl = (invoice: InvoiceItem): string | null => {
     const qbId = (invoice.quickbooksInvoiceId || "").trim();
-    // Only open exact transaction if qbId is a verified numeric Intuit ID from live sync (and not placeholder 149)
-    if (/^\d+$/.test(qbId) && qbId !== "149" && Number(qbId) < 100000) {
+    // "149" is the mock/placeholder returned when QB is not connected or API fails
+    // Any real Intuit transaction ID is a non-placeholder numeric string
+    if (qbId && qbId !== "149" && /^\d+$/.test(qbId)) {
       return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${qbId}`;
     }
-    // Clean working URL: opens QuickBooks Online Invoices ledger without "transaction does not exist" error
-    return `https://sandbox.qbo.intuit.com/app/invoices`;
+    return null;
   };
 
   const handlePrint = () => {
@@ -85,7 +86,8 @@ export default function SchoolInvoicesClient({
         {invoices.map((invoice) => {
           const title = invoice.charterTrip?.organizationName || invoice.notes || `Transportation Billing Statement (${invoice.invoiceNumber})`;
           const amountVal = Number(invoice.totalAmount || invoice.amount || 0);
-          const qbLink = getQbUrl(invoice);
+          const realQbUrl = getRealQbUrl(invoice);
+          const isQbSynced = !!realQbUrl;
 
           return (
             <Card key={invoice.id} id={`invoice-${invoice.id}`} className={`shadow-sm transition-all hover:shadow-md cursor-pointer ${
@@ -108,11 +110,19 @@ export default function SchoolInvoicesClient({
                         <span className="font-mono bg-slate-100 px-2 py-0.5 rounded border text-slate-800 font-bold">{invoice.invoiceNumber}</span>
                         <span>•</span>
                         <span>{invoice.dueDate ? `Due: ${formatDate(invoice.dueDate)}` : "Due upon receipt"}</span>
-                        {invoice.quickbooksInvoiceId && (
+                        {isQbSynced && (
                           <>
                             <span>•</span>
                             <span className="text-purple-700 font-semibold flex items-center gap-1">
-                              <CheckCircle className="w-3 h-3 text-purple-600" /> QB Synced #{invoice.quickbooksInvoiceId}
+                              <CheckCircle className="w-3 h-3 text-purple-600" /> QB #{invoice.quickbooksInvoiceId}
+                            </span>
+                          </>
+                        )}
+                        {!isQbSynced && invoice.quickbooksInvoiceId && (
+                          <>
+                            <span>•</span>
+                            <span className="text-amber-700 font-semibold flex items-center gap-1">
+                              QB Invoice (local only)
                             </span>
                           </>
                         )}
@@ -143,16 +153,24 @@ export default function SchoolInvoicesClient({
                         <FileText className="w-3.5 h-3.5 text-blue-600" /> View Statement
                       </Button>
 
-                      {invoice.quickbooksInvoiceId && (
+                      {isQbSynced && realQbUrl && (
                         <a 
-                          href={qbLink} 
+                          href={realQbUrl} 
                           target="_blank" 
                           rel="noreferrer"
                           className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shrink-0"
-                          title="Open exact invoice in QuickBooks Online"
+                          title={`Open Invoice #${invoice.quickbooksInvoiceId} in QuickBooks`}
                         >
                           <ExternalLink className="w-3.5 h-3.5" /> QuickBooks
                         </a>
+                      )}
+                      {!isQbSynced && invoice.quickbooksInvoiceId && (
+                        <span
+                          className="px-3.5 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold rounded-xl flex items-center gap-1.5 shrink-0 cursor-default"
+                          title="This invoice was created locally. Connect QuickBooks in Admin Settings to sync."
+                        >
+                          QB Not Synced
+                        </span>
                       )}
                     </div>
                   </div>

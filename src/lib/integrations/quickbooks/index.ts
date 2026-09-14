@@ -223,15 +223,15 @@ export const quickbooks = {
     const customerName = data.customerName;
 
     if (!process.env.QUICKBOOKS_CLIENT_ID) {
-      console.log("[QuickBooks Mock] Would create invoice for:", customerName, "Amount:", lineItems.reduce((acc, curr) => acc + curr.amount, 0));
-      return "149";
+      console.log("[QuickBooks] QUICKBOOKS_CLIENT_ID not set. QB invoice not created for:", customerName);
+      return null;
     }
 
     try {
       const qbo = await this.getClient();
       if (!qbo) {
-        console.log("[QuickBooks Mock] Provider not connected yet, returning mock invoice for:", customerName);
-        return "149";
+        console.log("[QuickBooks] Provider not connected yet (no OAuth tokens). QB invoice not created for:", customerName);
+        return null;
       }
 
       return new Promise((resolve, reject) => {
@@ -261,17 +261,17 @@ export const quickbooks = {
         }, (err: any, res: any) => {
           if (err) {
             console.warn("[QuickBooks API Warning] Real QB invoice creation returned error:", err?.Fault?.Error?.[0]?.Message || err);
-            return resolve("149");
+            return resolve(null);
           }
           const invoiceObj = res?.Invoice || res;
           const invoiceId = invoiceObj?.Id ? String(invoiceObj.Id) : null;
           console.log("[QuickBooks API Success] Live Invoice created in Intuit Sandbox! ID:", invoiceId, "DocNumber:", invoiceObj?.DocNumber);
-          resolve(invoiceId || "149");
+          resolve(invoiceId);
         });
       });
     } catch (error) {
-      console.warn("[QuickBooks] Failed to create invoice, falling back to mock:", error);
-      return "149";
+      console.warn("[QuickBooks] Failed to create invoice:", error);
+      return null;
     }
   },
 
