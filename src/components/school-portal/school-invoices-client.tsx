@@ -294,15 +294,23 @@ export default function SchoolInvoicesClient({
               </Button>
 
               <div className="flex items-center gap-2">
-                {selectedInvoice.quickbooksInvoiceId && (
+                {selectedInvoice.quickbooksInvoiceId && getRealQbUrl(selectedInvoice) && (
                   <a
-                    href={getQbUrl(selectedInvoice)}
+                    href={getRealQbUrl(selectedInvoice)!}
                     target="_blank"
                     rel="noreferrer"
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
                   >
                     <ExternalLink className="h-4 w-4" /> Open In QuickBooks
                   </a>
+                )}
+                {selectedInvoice.quickbooksInvoiceId && !getRealQbUrl(selectedInvoice) && (
+                  <span
+                    className="px-3.5 py-2 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold rounded-xl flex items-center gap-1.5 shrink-0 cursor-default"
+                    title="This invoice was created locally. Connect QuickBooks in Admin Settings to sync."
+                  >
+                    QB Not Synced
+                  </span>
                 )}
                 <Button
                   onClick={() => setSelectedInvoice(null)}
