@@ -30,14 +30,27 @@ export default auth((req: any) => {
   const isLoggedIn = !!session?.user;
   const userRole = session?.user?.role as UserRole | undefined;
 
+  // Resolve base origin matching the exact host requested (e.g. www.eaglebusconnect.com vs eaglebusconnect.com)
+  const host = req.headers.get("host") || nextUrl.host;
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const requestOrigin = `${proto}://${host}`;
+
   const isPublicRoute = PUBLIC_ROUTES.some(
     (route) => nextUrl.pathname === route || nextUrl.pathname.startsWith(route + "/")
   );
   const isAuthRoute = AUTH_ROUTES.some((route) => nextUrl.pathname.startsWith(route));
 
+  const createRedirect = (targetPath: string) => {
+    const redirectUrl = new URL(targetPath, requestOrigin);
+    const response = NextResponse.redirect(redirectUrl);
+    response.headers.set("Access-Control-Allow-Origin", req.headers.get("origin") || "*");
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+    return response;
+  };
+
   // If on auth page and already logged in, redirect to dashboard
   if (isAuthRoute && isLoggedIn) {
-    return NextResponse.redirect(new URL(getDashboardUrl(userRole), nextUrl));
+    return createRedirect(getDashboardUrl(userRole));
   }
 
   // Allow public routes
@@ -45,9 +58,12 @@ export default auth((req: any) => {
 
   // Must be logged in for protected routes
   if (!isLoggedIn) {
-    const loginUrl = new URL("/auth/login", nextUrl);
+    const loginUrl = new URL("/auth/login", requestOrigin);
     loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
+    const response = NextResponse.redirect(loginUrl);
+    response.headers.set("Access-Control-Allow-Origin", req.headers.get("origin") || "*");
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+    return response;
   }
 
   // Check role-based access
@@ -55,7 +71,7 @@ export default auth((req: any) => {
     if (nextUrl.pathname.startsWith(prefix)) {
       if (!userRole || !allowedRoles.includes(userRole)) {
         // Automatically redirect logged-in users to their authorized dashboard if trying to cross portals
-        return NextResponse.redirect(new URL(getDashboardUrl(userRole), nextUrl));
+        return createRedirect(getDashboardUrl(userRole));
       }
     }
   }
