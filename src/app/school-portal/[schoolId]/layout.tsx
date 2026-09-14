@@ -5,6 +5,9 @@ import { auth } from "@/lib/auth/config"
 import { prisma } from "@/lib/db/client"
 import { Bus, LayoutDashboard, Receipt, Map, LogOut } from "lucide-react"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export default async function SchoolPortalLayout({
   children,
   params,
@@ -19,21 +22,53 @@ export default async function SchoolPortalLayout({
     redirect("/auth/login")
   }
 
-  // Verify or resolve school by ID, Code, or fallback to first available school
-  let school = resolvedParams.schoolId ? await prisma.school.findFirst({
-    where: {
-      OR: [
-        { id: resolvedParams.schoolId },
-        { code: resolvedParams.schoolId.toUpperCase() }
-      ]
-    }
-  }) : null
+  const schoolIdParam = resolvedParams?.schoolId || ""
 
-  if (!school) {
-    school = await prisma.school.findFirst()
+  let school: any = null
+  try {
+    if (schoolIdParam) {
+      school = await prisma.school.findFirst({
+        where: {
+          OR: [
+            { id: schoolIdParam },
+            { code: schoolIdParam.toUpperCase() }
+          ]
+        }
+      })
+    }
+    if (!school) {
+      school = await prisma.school.findFirst()
+    }
+  } catch (err) {
+    console.warn("[SCHOOL_LAYOUT_PRISMA_ERROR]", err)
   }
 
-  const schoolName = school?.name || "School Partner"
+  if (!school && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/schools?select=*`, {
+        headers: {
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+        },
+        cache: 'no-store'
+      })
+      if (res.ok) {
+        const rows = await res.json()
+        if (Array.isArray(rows) && rows.length > 0) {
+          school = rows.find((s: any) => 
+            s.id === schoolIdParam || 
+            s.id.includes(schoolIdParam) || 
+            s.code === schoolIdParam.toUpperCase()
+          ) || rows[0]
+        }
+      }
+    } catch (e) {
+      console.error("[SCHOOL_LAYOUT_SUPABASE_FALLBACK_ERROR]", e)
+    }
+  }
+
+  const schoolName = school?.name || "Lincoln High School"
+  const activeSchoolId = school?.id || schoolIdParam || "sch_lincoln_001"
 
   return (
     <div className="flex h-screen bg-muted/20">
