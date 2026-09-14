@@ -73,10 +73,10 @@ export default async function SchoolPortalRootPage() {
               </p>
             </div>
           ) : (
-            schools.map((school) => {
-              const activeStudents = school.students.length
-              const activeRoutes = school.routes.length
-              const unpaidInvoices = school.invoices.filter(i => i.status !== "PAID").length
+            schools.map((school: any) => {
+              const activeStudents = school.students?.length || 0
+              const activeRoutes = school.routes?.length || 0
+              const unpaidInvoices = Array.isArray(school.invoices) ? school.invoices.filter((i: any) => i.status !== "PAID").length : 0
 
               return (
                 <div key={school.id} className="bg-card border border-border rounded-2xl p-6 shadow-sm hover:shadow-lg transition-all space-y-5 flex flex-col justify-between">

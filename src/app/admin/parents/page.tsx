@@ -103,7 +103,7 @@ export default async function AdminParentsPage() {
                           <span className="font-bold text-foreground">{childrenCount} Child(ren)</span>
                         </div>
                         <div className="text-xs text-muted-foreground truncate max-w-xs">
-                          {parent.students.map(s => `${s.firstName} (${s.school?.name || 'School'})`).join(", ")}
+                          {parent.students?.map((s: any) => `${s.firstName} (${s.school?.name || 'School'})`).join(", ")}
                         </div>
                       </td>
 
