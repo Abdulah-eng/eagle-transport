@@ -131,6 +131,9 @@ export async function POST(req: Request) {
     })
   } catch (error: any) {
     console.error("[AUTH_LOGIN_POST]", error)
-    return NextResponse.json({ error: "Authentication failed" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Authentication failed", 
+      details: error?.message || String(error) 
+    }, { status: 500 })
   }
 }
