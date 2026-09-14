@@ -129,7 +129,7 @@ export default async function AdminDashboardPage() {
               <CardDescription>Recent public & portal field trip requests</CardDescription>
             </div>
             <Button size="sm" variant="outline" asChild className="text-xs font-semibold">
-              <Link href="/admin/bookings">
+              <Link href="/admin/charter-trips">
                 View All Trips <ArrowRight className="w-3.5 h-3.5 ml-1" />
               </Link>
             </Button>
