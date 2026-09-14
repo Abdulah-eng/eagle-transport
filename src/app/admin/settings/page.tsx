@@ -3,6 +3,9 @@ import { db } from "@/lib/db"
 import { redirect } from "next/navigation"
 import SettingsClient from "./settings-client"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+
 export default async function AdminSettingsPage() {
   const session = await auth()
   if (!session?.user || (session.user.role !== "EAGLE_ADMIN" && session.user.role !== "OFFICE_STAFF")) {
