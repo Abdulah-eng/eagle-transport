@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -43,18 +43,25 @@ export default function SchoolInvoicesClient({
 }) {
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash) {
+      const hashId = window.location.hash.replace("#invoice-", "");
+      if (hashId) {
+        const found = invoices.find(inv => inv.id === hashId || inv.invoiceNumber === hashId);
+        if (found) {
+          setSelectedInvoice(found);
+        }
+      }
+    }
+  }, [invoices]);
+
   const getQbUrl = (invoice: InvoiceItem) => {
-    const qbId = invoice.quickbooksInvoiceId || "";
-    // If exact numeric Intuit transaction ID (e.g. "149", "1", "1002"), navigate directly to exact invoice
-    if (/^\d+$/.test(qbId)) {
+    const qbId = (invoice.quickbooksInvoiceId || "").trim();
+    // Only use txnId parameter if qbId is a pure numeric Intuit transaction ID (e.g. "149", "1056")
+    if (/^\d+$/.test(qbId) && Number(qbId) < 100000) {
       return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${qbId}`;
     }
-    // If ID contains a short numeric Intuit transaction ID (and not a timestamp/mock)
-    const cleanDigits = qbId.replace(/\D/g, "");
-    if (cleanDigits && cleanDigits.length <= 5 && !qbId.startsWith("mock_") && !qbId.includes("1789")) {
-      return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${cleanDigits}`;
-    }
-    // Otherwise open QuickBooks Sales & Invoices ledger view
+    // Otherwise return QuickBooks Online Invoices overview page
     return `https://sandbox.qbo.intuit.com/app/invoices`;
   };
 
@@ -80,14 +87,14 @@ export default function SchoolInvoicesClient({
           const qbLink = getQbUrl(invoice);
 
           return (
-            <Card key={invoice.id} id={`invoice-${invoice.id}`} className={`shadow-sm transition-all hover:shadow-md ${
+            <Card key={invoice.id} id={`invoice-${invoice.id}`} className={`shadow-sm transition-all hover:shadow-md cursor-pointer ${
               invoice.status === 'OVERDUE' || invoice.status === 'SENT' ? 'border-l-4 border-l-rose-500' : 
               invoice.status === 'PAID' ? 'border-l-4 border-l-emerald-500' : 'border-l-4 border-l-amber-500'
             }`}>
               <CardContent className="p-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                   
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-start gap-4" onClick={() => setSelectedInvoice(invoice)}>
                     <div className={`p-3 rounded-2xl ${
                       invoice.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 
                       invoice.status === 'DRAFT' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
@@ -95,7 +102,7 @@ export default function SchoolInvoicesClient({
                       <Receipt className="w-6 h-6" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg text-slate-900">{title}</h3>
+                      <h3 className="font-bold text-lg text-slate-900 hover:text-blue-600 transition-colors">{title}</h3>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 mt-1 font-medium">
                         <span className="font-mono bg-slate-100 px-2 py-0.5 rounded border text-slate-800 font-bold">{invoice.invoiceNumber}</span>
                         <span>•</span>
