@@ -20,15 +20,15 @@ const AUTH_ROUTES = ["/auth/login", "/auth/register"];
 const ROLE_ROUTES: Record<string, UserRole[]> = {
   "/admin": ["EAGLE_ADMIN", "OFFICE_STAFF"],
   "/school-portal": ["EAGLE_ADMIN", "OFFICE_STAFF", "SCHOOL_ADMIN"],
-  "/driver": ["EAGLE_ADMIN", "OFFICE_STAFF", "DRIVER"],
-  "/parent": ["EAGLE_ADMIN", "OFFICE_STAFF", "PARENT"],
+  "/driver": ["DRIVER"],
+  "/parent": ["PARENT"],
 };
 
 export default auth((req: any) => {
   const { nextUrl } = req;
   const session = req.auth;
   const isLoggedIn = !!session?.user;
-  const userRole = session?.user?.role;
+  const userRole = session?.user?.role as UserRole | undefined;
 
   const isPublicRoute = PUBLIC_ROUTES.some(
     (route) => nextUrl.pathname === route || nextUrl.pathname.startsWith(route + "/")
@@ -54,7 +54,8 @@ export default auth((req: any) => {
   for (const [prefix, allowedRoles] of Object.entries(ROLE_ROUTES)) {
     if (nextUrl.pathname.startsWith(prefix)) {
       if (!userRole || !allowedRoles.includes(userRole)) {
-        return NextResponse.redirect(new URL("/unauthorized", nextUrl));
+        // Automatically redirect logged-in users to their authorized dashboard if trying to cross portals
+        return NextResponse.redirect(new URL(getDashboardUrl(userRole), nextUrl));
       }
     }
   }

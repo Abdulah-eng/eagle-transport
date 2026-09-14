@@ -18,10 +18,12 @@ export default async function ParentPortalLayout({
     redirect("/auth/login")
   }
 
-  // Allow PARENT, or EAGLE_ADMIN / OFFICE_STAFF viewing parent portal
-  const allowedRoles = ["PARENT", "EAGLE_ADMIN", "OFFICE_STAFF"]
-  if (!allowedRoles.includes(session.user.role)) {
-    redirect("/unauthorized")
+  if (session.user.role === "EAGLE_ADMIN" || session.user.role === "OFFICE_STAFF") {
+    redirect("/admin/dashboard")
+  }
+
+  if (session.user.role !== "PARENT") {
+    redirect("/auth/login")
   }
 
   const navItems = [

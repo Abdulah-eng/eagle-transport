@@ -103,26 +103,26 @@ export async function POST(req: Request) {
       }
     }
 
-    // Determine target redirect URL
+    // Determine target redirect URL cleanly based on user role
     let redirectUrl = callbackUrl
-    if (!redirectUrl || redirectUrl === "/auth/login") {
-      switch (user.role) {
-        case "EAGLE_ADMIN":
-        case "OFFICE_STAFF":
-          redirectUrl = "/admin/dashboard"
-          break
-        case "SCHOOL_ADMIN":
-          redirectUrl = "/school-portal"
-          break
-        case "PARENT":
-          redirectUrl = "/parent/dashboard"
-          break
-        case "DRIVER":
-          redirectUrl = "/driver/manifest"
-          break
-        default:
-          redirectUrl = "/"
+    if (user.role === "EAGLE_ADMIN" || user.role === "OFFICE_STAFF") {
+      if (!redirectUrl || !redirectUrl.startsWith("/admin") || redirectUrl === "/auth/login") {
+        redirectUrl = "/admin/dashboard"
       }
+    } else if (user.role === "PARENT") {
+      if (!redirectUrl || !redirectUrl.startsWith("/parent") || redirectUrl === "/auth/login") {
+        redirectUrl = "/parent/dashboard"
+      }
+    } else if (user.role === "SCHOOL_ADMIN") {
+      if (!redirectUrl || !redirectUrl.startsWith("/school-portal") || redirectUrl === "/auth/login") {
+        redirectUrl = "/school-portal"
+      }
+    } else if (user.role === "DRIVER") {
+      if (!redirectUrl || !redirectUrl.startsWith("/driver") || redirectUrl === "/auth/login") {
+        redirectUrl = "/driver/manifest"
+      }
+    } else {
+      redirectUrl = "/"
     }
 
     return NextResponse.json({
