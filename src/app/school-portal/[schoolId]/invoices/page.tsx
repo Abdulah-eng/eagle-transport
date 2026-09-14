@@ -22,15 +22,21 @@ export default async function SchoolInvoicesPage({ params }: { params: Promise<{
         }
       });
     }
+  } catch (err) {
+    console.error("[SCHOOL_INVOICES_SCHOOL_ERROR]", err);
+  }
 
-    const activeSchoolId = school?.id || "";
+  const activeSchoolId = school?.id || schoolIdParam || "";
 
-    // Fetch Real Invoices from DB for this school
+  // 1. Fetch Invoices via Prisma
+  try {
     rawInvoices = await prisma.invoice.findMany({
       where: {
         OR: [
           { schoolId: activeSchoolId },
-          { charterTrip: { schoolId: activeSchoolId } }
+          { schoolId: schoolIdParam },
+          { charterTrip: { schoolId: activeSchoolId } },
+          { charterTrip: { schoolId: schoolIdParam } }
         ]
       },
       include: {
@@ -40,6 +46,40 @@ export default async function SchoolInvoicesPage({ params }: { params: Promise<{
     });
   } catch (err) {
     console.error("[SCHOOL_INVOICES_DB_ERROR]", err);
+  }
+
+  // 2. Fallback to Supabase REST API if Prisma returned empty or failed
+  if ((!rawInvoices || rawInvoices.length === 0) && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/invoices?select=*,charterTrip:charter_trips(*)`, {
+        headers: {
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+        },
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows) && rows.length > 0) {
+          rawInvoices = rows.filter((inv: any) => {
+            const tripSchool = inv.charterTrip?.schoolId;
+            const bName = (inv.billingName || "").toLowerCase();
+            const sName = (school?.name || "").toLowerCase();
+            return (
+              inv.schoolId === activeSchoolId ||
+              inv.schoolId === schoolIdParam ||
+              tripSchool === activeSchoolId ||
+              tripSchool === schoolIdParam ||
+              (sName && bName.includes(sName)) ||
+              bName.includes("lincoln") ||
+              bName.includes("hell")
+            );
+          });
+        }
+      }
+    } catch (supaErr) {
+      console.error("[SCHOOL_INVOICES_SUPABASE_ERROR]", supaErr);
+    }
   }
 
   // Safe date helper

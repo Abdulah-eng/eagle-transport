@@ -259,7 +259,9 @@ export async function POST(req: Request) {
 
     // Action 3: Generate QuickBooks Invoice
     if (action === "create_qb_invoice") {
-      const amount = trip.tripQuote?.amount ? Number(trip.tripQuote.amount) : 500.00
+      const tripQuoteObj = Array.isArray(trip.tripQuote) ? trip.tripQuote[0] : trip.tripQuote
+      const rawAmt = tripQuoteObj?.amount ?? trip.quoteAmount ?? trip.estimatedCost
+      const amount = (rawAmt !== undefined && rawAmt !== null && !isNaN(Number(rawAmt)) && Number(rawAmt) > 0) ? Number(rawAmt) : 500.00
       let qbInvoiceId: string | null = null
 
       try {

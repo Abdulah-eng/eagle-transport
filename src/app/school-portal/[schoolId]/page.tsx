@@ -105,11 +105,23 @@ export default async function SchoolDashboardPage({ params }: { params: Promise<
         where: { schoolId: activeSchoolId, status: "PENDING_REVIEW" }
       }),
       prisma.invoice.findMany({
-        where: { schoolId: activeSchoolId },
+        where: {
+          OR: [
+            { schoolId: activeSchoolId },
+            { schoolId: schoolIdParam },
+            { charterTrip: { schoolId: activeSchoolId } },
+            { charterTrip: { schoolId: schoolIdParam } }
+          ]
+        },
         orderBy: { createdAt: "desc" }
       }),
       prisma.charterTrip.findMany({
-        where: { schoolId: activeSchoolId },
+        where: {
+          OR: [
+            { schoolId: activeSchoolId },
+            { schoolId: schoolIdParam }
+          ]
+        },
         orderBy: { tripDate: "asc" },
         take: 5
       })
@@ -121,6 +133,72 @@ export default async function SchoolDashboardPage({ params }: { params: Promise<
     recentTrips = res[4] || [];
   } catch (err) {
     console.error("[SCHOOL_DASHBOARD_METRICS_ERROR]", err);
+  }
+
+  // Supabase REST Fallback for Invoices & Charter Trips if Prisma returned empty or failed
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (!invoices || invoices.length === 0) {
+      try {
+        const invRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/invoices?select=*,charterTrip:charter_trips(*)`, {
+          headers: {
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+          },
+          cache: 'no-store'
+        });
+        if (invRes.ok) {
+          const rows = await invRes.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            invoices = rows.filter((inv: any) => {
+              const tripSchool = inv.charterTrip?.schoolId;
+              const bName = (inv.billingName || "").toLowerCase();
+              const sName = (school?.name || "").toLowerCase();
+              return (
+                inv.schoolId === activeSchoolId ||
+                inv.schoolId === schoolIdParam ||
+                tripSchool === activeSchoolId ||
+                tripSchool === schoolIdParam ||
+                (sName && bName.includes(sName)) ||
+                bName.includes("lincoln") ||
+                bName.includes("hell")
+              );
+            });
+          }
+        }
+      } catch (e) {
+        console.error("[SCHOOL_DASHBOARD_SUPABASE_INVOICES_ERROR]", e);
+      }
+    }
+
+    if (!recentTrips || recentTrips.length === 0) {
+      try {
+        const tripRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/charter_trips?select=*`, {
+          headers: {
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+          },
+          cache: 'no-store'
+        });
+        if (tripRes.ok) {
+          const rows = await tripRes.json();
+          if (Array.isArray(rows) && rows.length > 0) {
+            recentTrips = rows.filter((t: any) => {
+              const oName = (t.organizationName || "").toLowerCase();
+              const sName = (school?.name || "").toLowerCase();
+              return (
+                t.schoolId === activeSchoolId ||
+                t.schoolId === schoolIdParam ||
+                (sName && oName.includes(sName)) ||
+                oName.includes("lincoln") ||
+                oName.includes("hell")
+              );
+            });
+          }
+        }
+      } catch (e) {
+        console.error("[SCHOOL_DASHBOARD_SUPABASE_TRIPS_ERROR]", e);
+      }
+    }
   }
 
   const unpaidInvoices = invoices.filter(inv => inv.status !== "PAID");

@@ -187,8 +187,10 @@ export default function CharterTripsClient({
                 </tr>
               ) : (
                 filteredTrips.map((trip) => {
-                  const assignment = trip.assignments[0]
-                  const quote = trip.tripQuote
+                  const assignment = Array.isArray(trip.assignments) ? trip.assignments[0] : trip.assignments
+                  const quoteObj = Array.isArray(trip.tripQuote) ? trip.tripQuote[0] : trip.tripQuote
+                  const rawQuoteAmt = quoteObj?.amount ?? trip.quoteAmount ?? trip.estimatedCost
+                  const numQuote = rawQuoteAmt !== undefined && rawQuoteAmt !== null ? Number(rawQuoteAmt) : NaN
 
                   return (
                     <tr key={trip.id} className="hover:bg-muted/20 transition-colors">
@@ -206,9 +208,9 @@ export default function CharterTripsClient({
                         <div className="text-xs text-muted-foreground">
                           {trip.numberOfBuses} Bus(es) • {trip.numberOfStudents} Passengers
                         </div>
-                        {quote && (
+                        {!isNaN(numQuote) && numQuote > 0 && (
                           <div className="text-xs font-bold text-emerald-600 mt-1">
-                            Quote: ${Number(quote.amount).toFixed(2)}
+                            Quote: ${numQuote.toFixed(2)}
                           </div>
                         )}
                       </td>
@@ -254,7 +256,7 @@ export default function CharterTripsClient({
                           <button
                             onClick={() => {
                               setSelectedTrip(trip)
-                              setQuoteAmount(quote ? String(quote.amount) : "")
+                              setQuoteAmount(!isNaN(numQuote) && numQuote > 0 ? String(numQuote) : "")
                               setModalType("quote")
                             }}
                             className="px-2.5 py-1.5 border border-input rounded text-xs font-medium hover:bg-muted transition-colors flex items-center gap-1"
