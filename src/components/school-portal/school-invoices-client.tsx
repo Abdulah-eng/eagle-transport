@@ -45,9 +45,17 @@ export default function SchoolInvoicesClient({
 
   const getQbUrl = (invoice: InvoiceItem) => {
     const qbId = invoice.quickbooksInvoiceId || "";
+    // If exact numeric Intuit transaction ID (e.g. "149", "1", "1002"), navigate directly to exact invoice
+    if (/^\d+$/.test(qbId)) {
+      return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${qbId}`;
+    }
+    // If ID contains a short numeric Intuit transaction ID (and not a timestamp/mock)
     const cleanDigits = qbId.replace(/\D/g, "");
-    const txnId = cleanDigits ? (cleanDigits.length > 5 ? cleanDigits.slice(-5) : cleanDigits) : "101";
-    return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${txnId}`;
+    if (cleanDigits && cleanDigits.length <= 5 && !qbId.startsWith("mock_") && !qbId.includes("1789")) {
+      return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${cleanDigits}`;
+    }
+    // Otherwise open QuickBooks Sales & Invoices ledger view
+    return `https://sandbox.qbo.intuit.com/app/invoices`;
   };
 
   const handlePrint = () => {
