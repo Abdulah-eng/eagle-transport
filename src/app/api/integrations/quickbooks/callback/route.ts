@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
 
   try {
     await quickbooksService.handleCallback(code, realmId);
+    return NextResponse.redirect(new URL("/admin/settings?toast=QuickBooks+Connected", request.url));
   } catch (error: any) {
     console.error("[QuickBooks Auth]", error);
+    return NextResponse.redirect(new URL(`/admin/settings?error=${encodeURIComponent(error?.message || "QuickBooks connection failed")}`, request.url));
   }
-
-  return NextResponse.redirect(new URL("/admin/settings?toast=QuickBooks+Connected", request.url));
 }

@@ -11,10 +11,9 @@ export async function GET(request: NextRequest) {
 
   try {
     await googleCalendarService.handleCallback(code);
+    return NextResponse.redirect(new URL("/admin/settings?toast=Google+Calendar+Connected", request.url));
   } catch (error: any) {
     console.error("[Google Calendar Auth]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.redirect(new URL(`/admin/settings?error=${encodeURIComponent(error?.message || "Google Calendar connection failed")}`, request.url));
   }
-
-  return NextResponse.redirect(new URL("/admin/settings?toast=Google+Calendar+Connected", request.url));
 }

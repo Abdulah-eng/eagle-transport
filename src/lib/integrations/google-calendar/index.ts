@@ -112,11 +112,13 @@ export const googleCalendar = {
     const { tokens } = await oauth2Client.getToken(code);
 
     const data = {
+      id: `int_gcal_${Date.now()}`,
       provider: "google_calendar",
       accessToken: tokens.access_token || null,
       refreshToken: tokens.refresh_token || null,
-      expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-      updatedAt: new Date(),
+      expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     let upserted = false;
@@ -142,7 +144,7 @@ export const googleCalendar = {
 
     if (!upserted && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations?on_conflict=provider`, {
           method: 'POST',
           headers: {
             'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -152,8 +154,13 @@ export const googleCalendar = {
           },
           body: JSON.stringify(data)
         });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Supabase REST integrations insert failed (${res.status}): ${errText}`);
+        }
       } catch (e) {
         console.error("[Google Calendar] Supabase REST API upsert fallback failed:", e);
+        throw e;
       }
     }
   },

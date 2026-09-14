@@ -85,14 +85,16 @@ export const quickbooks = {
     if (!upserted && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       try {
         const data = {
+          id: `int_qb_${Date.now()}`,
           provider: "quickbooks",
           accessToken: tokens.access_token,
           refreshToken: tokens.refresh_token,
           realmId: realmId,
           expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString(),
+          createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations?on_conflict=provider`, {
           method: 'POST',
           headers: {
             'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -102,8 +104,13 @@ export const quickbooks = {
           },
           body: JSON.stringify(data)
         });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Supabase REST integrations insert failed (${res.status}): ${errText}`);
+        }
       } catch (e) {
         console.error("[QuickBooks] Supabase REST API upsert fallback failed:", e);
+        throw e;
       }
     }
   },
@@ -132,8 +139,9 @@ export const quickbooks = {
     }
 
     const tokens = await tokenResponse.json();
+    let updated: any = null;
     try {
-      return await prisma.integration.update({
+      updated = await prisma.integration.update({
         where: { provider: "quickbooks" },
         data: {
           accessToken: tokens.access_token,
@@ -142,13 +150,36 @@ export const quickbooks = {
         }
       });
     } catch {
-      return {
+      updated = {
         provider: "quickbooks",
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiresAt: new Date(Date.now() + (tokens.expires_in * 1000))
       };
     }
+
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations?provider=eq.quickbooks`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            accessToken: tokens.access_token,
+            refreshToken: tokens.refresh_token,
+            expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString(),
+            updatedAt: new Date().toISOString()
+          })
+        });
+      } catch (e) {
+        console.error("[QuickBooks] Supabase REST refresh token sync failed:", e);
+      }
+    }
+
+    return updated;
   },
 
   async getClient(): Promise<QuickBooks | null> {
@@ -183,7 +214,17 @@ export const quickbooks = {
     }
 
     // Auto refresh token if expired or about to expire in 5 minutes
-    const isExpired = !integration.expiresAt || (integration.expiresAt.getTime() - Date.now() < 5 * 60 * 1000);
+    const expiresMs = integration.expiresAt ? new Date(integration.expiresAt).getTime() : 0;
+    const isExpired = !expiresMs || (expiresMs - Date.now() < 5 * 60 * 1000);
+    if (isExpired && integration.refreshToken) {
+      try {
+        console.log("[QuickBooks] Access token expired, refreshing via Intuit OAuth...");
+        integration = await this.refreshTokens(integration.refreshToken);
+        console.log("[QuickBooks] Access token successfully refreshed!");
+      } catch (err) {
+        console.error("[QuickBooks] Auto-refresh token failed:", err);
+      }
+    }
     if (isExpired && integration.refreshToken) {
       try {
         console.log("[QuickBooks] Access token expired, refreshing via Intuit OAuth...");

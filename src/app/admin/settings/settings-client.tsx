@@ -17,6 +17,7 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
   const searchParams = useSearchParams()
   const [testingConnection, setTestingConnection] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(searchParams.get("toast"))
+  const [errorToast, setErrorToast] = useState<string | null>(searchParams.get("error"))
 
   const handleTestIntegration = (name: string) => {
     setTestingConnection(name)
@@ -31,24 +32,25 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
     integrations.some((i) => 
       (i.provider === "quickbooks") && 
       (i.accessToken || i.access_token || i.is_connected || i.refreshToken || i.refresh_token)
-    ) || 
-    !!searchParams.get("toast")?.toLowerCase().includes("quickbooks") || 
-    !!toast?.toLowerCase().includes("quickbooks")
+    )
 
   const isGoogleConnected = 
     integrations.some((i) => 
       (i.provider === "google_calendar" || i.provider === "google") && 
       (i.accessToken || i.access_token || i.is_connected || i.refreshToken || i.refresh_token)
-    ) || 
-    !!searchParams.get("toast")?.toLowerCase().includes("google") || 
-    !!toast?.toLowerCase().includes("google")
+    )
 
   return (
     <div className="space-y-6">
-      {/* Toast */}
+      {/* Toast Notifications */}
       {toast && (
-        <div className="fixed top-4 right-4 z-50 p-4 bg-emerald-600 text-white font-semibold rounded-xl shadow-xl flex items-center gap-2">
+        <div className="fixed top-4 right-4 z-50 p-4 bg-emerald-600 text-white font-semibold rounded-xl shadow-xl flex items-center gap-2 animate-fade-in">
           <CheckCircle2 className="w-5 h-5" /> {toast}
+        </div>
+      )}
+      {errorToast && (
+        <div className="fixed top-4 right-4 z-50 p-4 bg-rose-600 text-white font-semibold rounded-xl shadow-xl flex items-center gap-2 animate-fade-in">
+          <AlertTriangle className="w-5 h-5" /> {errorToast}
         </div>
       )}
 
