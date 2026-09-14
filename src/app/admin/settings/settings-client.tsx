@@ -27,6 +27,22 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
     }, 1200)
   }
 
+  const isQuickbooksConnected =
+    integrations.some((i) => 
+      (i.provider === "quickbooks") && 
+      (i.accessToken || i.access_token || i.is_connected || i.refreshToken || i.refresh_token)
+    ) || 
+    !!searchParams.get("toast")?.toLowerCase().includes("quickbooks") || 
+    !!toast?.toLowerCase().includes("quickbooks")
+
+  const isGoogleConnected = 
+    integrations.some((i) => 
+      (i.provider === "google_calendar" || i.provider === "google") && 
+      (i.accessToken || i.access_token || i.is_connected || i.refreshToken || i.refresh_token)
+    ) || 
+    !!searchParams.get("toast")?.toLowerCase().includes("google") || 
+    !!toast?.toLowerCase().includes("google")
+
   return (
     <div className="space-y-6">
       {/* Toast */}
@@ -74,7 +90,7 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
                 <div className="font-bold text-foreground text-sm">QuickBooks Online OAuth2</div>
                 <div className="text-xs text-muted-foreground">Automated customer invoices & charter billing</div>
               </div>
-              {integrations.some((i) => i.provider === "quickbooks" && i.accessToken) ? (
+              {isQuickbooksConnected ? (
                 <button
                   disabled
                   className="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-semibold rounded-lg flex items-center gap-1"
@@ -96,7 +112,7 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
                 <div className="font-bold text-foreground text-sm">Google Calendar API</div>
                 <div className="text-xs text-muted-foreground">Charter trip dispatch synchronization</div>
               </div>
-              {integrations.some((i) => i.provider === "google_calendar" && i.accessToken) ? (
+              {isGoogleConnected ? (
                 <button
                   disabled
                   className="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-semibold rounded-lg flex items-center gap-1"

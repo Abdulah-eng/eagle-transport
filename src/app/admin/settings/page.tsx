@@ -27,6 +27,24 @@ export default async function AdminSettingsPage() {
     console.error("[ADMIN_SETTINGS_DB_ERROR]", err)
   }
 
+  if (integrations.length === 0 && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations?select=*`, {
+        headers: {
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+        },
+        cache: 'no-store'
+      })
+      if (res.ok) {
+        const rows = await res.json()
+        if (Array.isArray(rows)) integrations = rows
+      }
+    } catch (e) {
+      console.error("[ADMIN_SETTINGS_SUPABASE_FALLBACK_ERROR]", e)
+    }
+  }
+
   return (
     <SettingsClient 
       envCheck={envCheck}
