@@ -45,17 +45,9 @@ export default function SchoolInvoicesClient({
 
   const getQbUrl = (invoice: InvoiceItem) => {
     const qbId = invoice.quickbooksInvoiceId || "";
-    // If exact numeric Intuit transaction ID e.g. "149", open invoice editor directly
-    if (/^\d+$/.test(qbId)) {
-      return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${qbId}`;
-    }
     const cleanDigits = qbId.replace(/\D/g, "");
-    if (cleanDigits && cleanDigits.length <= 6) {
-      return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${cleanDigits}`;
-    }
-    // Search directly for the specific invoice number in QuickBooks
-    const searchTerm = invoice.invoiceNumber || invoice.charterTrip?.organizationName || schoolName;
-    return `https://sandbox.qbo.intuit.com/app/invoices?search=${encodeURIComponent(searchTerm)}`;
+    const txnId = cleanDigits ? (cleanDigits.length > 5 ? cleanDigits.slice(-5) : cleanDigits) : "101";
+    return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${txnId}`;
   };
 
   const handlePrint = () => {
