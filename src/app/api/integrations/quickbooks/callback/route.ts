@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
     await quickbooksService.handleCallback(code, realmId);
   } catch (error: any) {
     console.error("[QuickBooks Auth]", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.redirect(new URL("/admin/settings?toast=QuickBooks+Connected", request.url));

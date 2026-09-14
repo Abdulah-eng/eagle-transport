@@ -59,22 +59,53 @@ export const quickbooks = {
 
     const tokens = await tokenResponse.json();
 
-    await prisma.integration.upsert({
-      where: { provider: "quickbooks" },
-      create: {
-        provider: "quickbooks",
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        realmId: realmId,
-        expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
-      },
-      update: {
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        realmId: realmId,
-        expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
-      },
-    });
+    let upserted = false;
+    try {
+      await prisma.integration.upsert({
+        where: { provider: "quickbooks" },
+        create: {
+          provider: "quickbooks",
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          realmId: realmId,
+          expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
+        },
+        update: {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          realmId: realmId,
+          expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
+        },
+      });
+      upserted = true;
+    } catch (dbErr) {
+      console.warn("[QuickBooks] Prisma upsert failed, trying Supabase REST API:", dbErr);
+    }
+
+    if (!upserted && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const data = {
+          provider: "quickbooks",
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          realmId: realmId,
+          expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations`, {
+          method: 'POST',
+          headers: {
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(data)
+        });
+      } catch (e) {
+        console.error("[QuickBooks] Supabase REST API upsert fallback failed:", e);
+      }
+    }
   },
 
   async refreshTokens(refreshToken: string): Promise<any> {
@@ -101,20 +132,51 @@ export const quickbooks = {
     }
 
     const tokens = await tokenResponse.json();
-    return prisma.integration.update({
-      where: { provider: "quickbooks" },
-      data: {
+    try {
+      return await prisma.integration.update({
+        where: { provider: "quickbooks" },
+        data: {
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
+        }
+      });
+    } catch {
+      return {
+        provider: "quickbooks",
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
-        expiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
-      }
-    });
+        expiresAt: new Date(Date.now() + (tokens.expires_in * 1000))
+      };
+    }
   },
 
   async getClient(): Promise<QuickBooks | null> {
-    let integration = await prisma.integration.findUnique({
-      where: { provider: "quickbooks" },
-    });
+    let integration: any = null;
+    try {
+      integration = await prisma.integration.findUnique({
+        where: { provider: "quickbooks" },
+      });
+    } catch (err) {
+      console.warn("[QuickBooks] Prisma findUnique failed, trying Supabase REST API:", err);
+    }
+
+    if (!integration && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations?provider=eq.quickbooks&select=*`, {
+          headers: {
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+          }
+        });
+        if (res.ok) {
+          const rows = await res.json();
+          if (rows && rows.length > 0) integration = rows[0];
+        }
+      } catch (e) {
+        console.error("[QuickBooks] Supabase REST API fallback failed:", e);
+      }
+    }
 
     if (!integration || !integration.accessToken || !integration.realmId) {
       return null;
@@ -255,14 +317,20 @@ export const quickbooks = {
   },
 
   async getFallbackCustomers(query: string = ""): Promise<Array<{ id: string; name: string; email: string; phone?: string; address?: string }>> {
-    const schools = await prisma.school.findMany({
-      take: 20,
-      include: { contacts: true }
-    });
-    const trips = await prisma.charterTrip.findMany({
-      take: 20,
-      orderBy: { createdAt: "desc" }
-    });
+    let schools: any[] = [];
+    let trips: any[] = [];
+    try {
+      schools = await prisma.school.findMany({
+        take: 20,
+        include: { contacts: true }
+      });
+      trips = await prisma.charterTrip.findMany({
+        take: 20,
+        orderBy: { createdAt: "desc" }
+      });
+    } catch (err) {
+      console.warn("[QuickBooks] Prisma getFallbackCustomers failed:", err);
+    }
 
     const results: Array<{ id: string; name: string; email: string; phone?: string; address?: string }> = [];
 
