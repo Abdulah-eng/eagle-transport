@@ -10,21 +10,31 @@ import {
 export default async function SchoolPortalRootPage() {
   const session = await auth()
 
-  // Fetch all schools
-  const schools = await db.school.findMany({
-    include: {
-      students: true,
-      invoices: true,
-      routes: true,
-    },
-    orderBy: { name: "asc" }
-  })
+  let schools: any[] = []
+  try {
+    // Fetch all schools
+    schools = await db.school.findMany({
+      include: {
+        students: true,
+        invoices: true,
+        routes: true,
+      },
+      orderBy: { name: "asc" }
+    })
+  } catch (err) {
+    console.error("[SCHOOL_PORTAL_ROOT_DB_ERROR]", err)
+  }
 
   // If user is a SCHOOL_ADMIN, redirect directly to their assigned school
   if (session?.user?.role === "SCHOOL_ADMIN") {
-    const schoolAdmin = await db.schoolAdmin.findFirst({
-      where: { userId: session.user.id }
-    })
+    let schoolAdmin: any = null
+    try {
+      schoolAdmin = await db.schoolAdmin.findFirst({
+        where: { userId: session.user.id }
+      })
+    } catch (err) {
+      console.error("[SCHOOL_ADMIN_FIND_ERROR]", err)
+    }
     if (schoolAdmin?.schoolId) {
       redirect(`/school-portal/${schoolAdmin.schoolId}`)
     }

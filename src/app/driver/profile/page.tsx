@@ -10,26 +10,31 @@ export default async function DriverProfilePage() {
   const session = await auth()
   if (!session?.user) redirect("/auth/login")
 
-  const driver = await db.driver.findFirst({
-    where: {
-      OR: [
-        { userId: session.user.id },
-        { email: session.user.email || "" }
-      ]
-    },
-    include: {
-      assignments: {
-        include: {
-          bus: true,
-          run: {
-            include: { route: true }
+  let driver: any = null
+  try {
+    driver = await db.driver.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          { email: session.user.email || "" }
+        ]
+      },
+      include: {
+        assignments: {
+          include: {
+            bus: true,
+            run: {
+              include: { route: true }
+            }
           }
         }
       }
-    }
-  })
+    })
+  } catch (err) {
+    console.error("[DRIVER_PROFILE_DB_ERROR]", err)
+  }
 
-  const assignment = driver?.assignments[0]
+  const assignment = driver?.assignments?.[0]
   const bus = assignment?.bus
 
   return (

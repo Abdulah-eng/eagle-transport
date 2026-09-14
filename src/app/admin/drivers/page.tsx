@@ -12,19 +12,24 @@ export default async function AdminDriversPage() {
     redirect("/auth/login")
   }
 
-  const drivers = await db.driver.findMany({
-    include: {
-      assignments: {
-        include: {
-          bus: true,
-          run: {
-            include: { route: true }
+  let drivers: any[] = []
+  try {
+    drivers = await db.driver.findMany({
+      include: {
+        assignments: {
+          include: {
+            bus: true,
+            run: {
+              include: { route: true }
+            }
           }
         }
-      }
-    },
-    orderBy: { firstName: "asc" }
-  })
+      },
+      orderBy: { firstName: "asc" }
+    })
+  } catch (err) {
+    console.error("[ADMIN_DRIVERS_DB_ERROR]", err)
+  }
 
   return (
     <div className="space-y-6">

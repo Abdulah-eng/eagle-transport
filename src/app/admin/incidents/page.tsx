@@ -12,14 +12,19 @@ export default async function AdminIncidentsPage() {
     redirect("/auth/login")
   }
 
-  const incidents = await db.incident.findMany({
-    include: {
-      driver: true,
-      student: true,
-      school: true,
-    },
-    orderBy: { date: "desc" }
-  })
+  let incidents: any[] = []
+  try {
+    incidents = await db.incident.findMany({
+      include: {
+        driver: true,
+        student: true,
+        school: true,
+      },
+      orderBy: { date: "desc" }
+    })
+  } catch (err) {
+    console.error("[ADMIN_INCIDENTS_DB_ERROR]", err)
+  }
 
   return (
     <div className="space-y-6">

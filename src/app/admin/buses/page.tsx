@@ -12,14 +12,19 @@ export default async function AdminBusesPage() {
     redirect("/auth/login")
   }
 
-  const buses = await db.bus.findMany({
-    include: {
-      driverAssignments: {
-        include: { driver: true }
-      }
-    },
-    orderBy: { busNumber: "asc" }
-  })
+  let buses: any[] = []
+  try {
+    buses = await db.bus.findMany({
+      include: {
+        driverAssignments: {
+          include: { driver: true }
+        }
+      },
+      orderBy: { busNumber: "asc" }
+    })
+  } catch (err) {
+    console.error("[ADMIN_BUSES_DB_ERROR]", err)
+  }
 
   return (
     <div className="space-y-6">

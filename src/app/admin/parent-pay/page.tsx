@@ -9,44 +9,52 @@ export default async function AdminParentPayPage() {
     redirect("/auth/login")
   }
 
-  // Fetch registrations with student, parent, school, invoices, payments
-  const registrations = await db.registration.findMany({
-    include: {
-      student: {
-        include: {
-          parent: true,
+  let registrations: any[] = []
+  let schools: any[] = []
+  let credits: any[] = []
+
+  try {
+    // Fetch registrations with student, parent, school, invoices, payments
+    registrations = await db.registration.findMany({
+      include: {
+        student: {
+          include: {
+            parent: true,
+          }
+        },
+        school: {
+          include: {
+            settings: true,
+          }
+        },
+        invoices: {
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          take: 3,
         }
       },
-      school: {
-        include: {
-          settings: true,
-        }
-      },
-      invoices: {
-        orderBy: { createdAt: "desc" },
-        take: 3,
-      },
-      payments: {
-        orderBy: { createdAt: "desc" },
-        take: 3,
-      }
-    },
-    orderBy: { submittedAt: "desc" }
-  })
+      orderBy: { submittedAt: "desc" }
+    })
 
-  // Fetch schools with settings for rate config
-  const schools = await db.school.findMany({
-    include: {
-      settings: true,
-    },
-    orderBy: { name: "asc" }
-  })
+    // Fetch schools with settings for rate config
+    schools = await db.school.findMany({
+      include: {
+        settings: true,
+      },
+      orderBy: { name: "asc" }
+    })
 
-  // Fetch all recent credits
-  const credits = await db.credit.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 20,
-  })
+    // Fetch all recent credits
+    credits = await db.credit.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    })
+  } catch (err) {
+    console.error("[ADMIN_PARENT_PAY_DB_ERROR]", err)
+  }
 
   // Calculate metrics
   let totalMRR = 0
@@ -60,7 +68,7 @@ export default async function AdminParentPayPage() {
     if (reg.paymentStatus === "SUSPENDED") suspendedCount++
 
     // Monthly rate calculation based on school settings
-    const settings = reg.school.settings
+    const settings = reg.school?.settings
     let rate = 0
     if (settings) {
       if (reg.serviceType === "AM_ONLY") rate = Number(settings.amRate) || 120

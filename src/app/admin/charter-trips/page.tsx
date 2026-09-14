@@ -9,30 +9,38 @@ export default async function AdminCharterTripsPage() {
     redirect("/auth/login")
   }
 
-  const charterTrips = await db.charterTrip.findMany({
-    include: {
-      school: true,
-      tripQuote: true,
-      assignments: {
-        include: {
-          driver: true,
-          bus: true,
-        }
+  let charterTrips: any[] = []
+  let drivers: any[] = []
+  let buses: any[] = []
+
+  try {
+    charterTrips = await db.charterTrip.findMany({
+      include: {
+        school: true,
+        tripQuote: true,
+        assignments: {
+          include: {
+            driver: true,
+            bus: true,
+          }
+        },
+        invoices: true,
       },
-      invoices: true,
-    },
-    orderBy: { tripDate: "asc" }
-  })
+      orderBy: { tripDate: "asc" }
+    })
 
-  const drivers = await db.driver.findMany({
-    where: { isActive: true },
-    orderBy: { firstName: "asc" }
-  })
+    drivers = await db.driver.findMany({
+      where: { isActive: true },
+      orderBy: { firstName: "asc" }
+    })
 
-  const buses = await db.bus.findMany({
-    where: { isActive: true },
-    orderBy: { busNumber: "asc" }
-  })
+    buses = await db.bus.findMany({
+      where: { isActive: true },
+      orderBy: { busNumber: "asc" }
+    })
+  } catch (err) {
+    console.error("[ADMIN_CHARTER_TRIPS_DB_ERROR]", err)
+  }
 
   return (
     <CharterTripsClient 

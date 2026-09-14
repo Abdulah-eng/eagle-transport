@@ -10,27 +10,30 @@ export default async function DriverRoutePage() {
   const session = await auth()
   if (!session?.user) redirect("/auth/login")
 
-  const driver = await db.driver.findFirst({
-    where: {
-      OR: [
-        { userId: session.user.id },
-        { email: session.user.email || "" }
-      ]
-    },
-    include: {
-      assignments: {
-        include: {
-          bus: true,
-          run: {
-            include: {
-              route: true,
-              stops: {
-                orderBy: { sequence: "asc" },
-                include: {
-                  routeAssignments: {
-                    include: {
-                      registration: {
-                        include: { student: true }
+  let driver: any = null
+  try {
+    driver = await db.driver.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          { email: session.user.email || "" }
+        ]
+      },
+      include: {
+        assignments: {
+          include: {
+            bus: true,
+            run: {
+              include: {
+                route: true,
+                stops: {
+                  orderBy: { sequence: "asc" },
+                  include: {
+                    routeAssignments: {
+                      include: {
+                        registration: {
+                          include: { student: true }
+                        }
                       }
                     }
                   }
@@ -40,10 +43,12 @@ export default async function DriverRoutePage() {
           }
         }
       }
-    }
-  })
+    })
+  } catch (err) {
+    console.error("[DRIVER_ROUTE_DB_ERROR]", err)
+  }
 
-  const assignment = driver?.assignments[0]
+  const assignment = driver?.assignments?.[0]
   const run = assignment?.run
   const route = run?.route
   const stops = run?.stops || []

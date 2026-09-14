@@ -12,19 +12,24 @@ export default async function AdminParentsPage() {
     redirect("/auth/login")
   }
 
-  const parents = await db.parent.findMany({
-    include: {
-      students: {
-        include: {
-          school: true,
-          registrations: true,
-        }
+  let parents: any[] = []
+  try {
+    parents = await db.parent.findMany({
+      include: {
+        students: {
+          include: {
+            school: true,
+            registrations: true,
+          }
+        },
+        invoices: true,
+        payments: true,
       },
-      invoices: true,
-      payments: true,
-    },
-    orderBy: { createdAt: "desc" }
-  })
+      orderBy: { createdAt: "desc" }
+    })
+  } catch (err) {
+    console.error("[ADMIN_PARENTS_DB_ERROR]", err)
+  }
 
   return (
     <div className="space-y-6">
@@ -66,8 +71,8 @@ export default async function AdminParentsPage() {
                 </tr>
               ) : (
                 parents.map((parent) => {
-                  const childrenCount = parent.students.length
-                  const hasOverdue = parent.invoices.some(i => i.status === "OVERDUE")
+                  const childrenCount = parent.students?.length || 0
+                  const hasOverdue = Array.isArray(parent.invoices) && parent.invoices.some((i: any) => i?.status === "OVERDUE")
 
                   return (
                     <tr key={parent.id} className="hover:bg-muted/20 transition-colors">

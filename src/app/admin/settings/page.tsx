@@ -20,7 +20,12 @@ export default async function AdminSettingsPage() {
     RESEND_API_KEY: !!process.env.RESEND_API_KEY,
   }
 
-  const integrations = await db.integration.findMany()
+  let integrations: any[] = []
+  try {
+    integrations = await db.integration.findMany()
+  } catch (err) {
+    console.error("[ADMIN_SETTINGS_DB_ERROR]", err)
+  }
 
   return (
     <SettingsClient 

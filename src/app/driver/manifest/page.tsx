@@ -10,30 +10,33 @@ export default async function DriverManifestPage() {
   const session = await auth()
   if (!session?.user) redirect("/auth/login")
 
-  // Fetch driver assignments and student manifest
-  const driver = await db.driver.findFirst({
-    where: {
-      OR: [
-        { userId: session.user.id },
-        { email: session.user.email || "" }
-      ]
-    },
-    include: {
-      assignments: {
-        include: {
-          bus: true,
-          run: {
-            include: {
-              route: true,
-              stops: {
-                orderBy: { sequence: "asc" },
-                include: {
-                  routeAssignments: {
-                    include: {
-                      registration: {
-                        include: {
-                          student: {
-                            include: { parent: true }
+  let driver: any = null
+  try {
+    // Fetch driver assignments and student manifest
+    driver = await db.driver.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          { email: session.user.email || "" }
+        ]
+      },
+      include: {
+        assignments: {
+          include: {
+            bus: true,
+            run: {
+              include: {
+                route: true,
+                stops: {
+                  orderBy: { sequence: "asc" },
+                  include: {
+                    routeAssignments: {
+                      include: {
+                        registration: {
+                          include: {
+                            student: {
+                              include: { parent: true }
+                            }
                           }
                         }
                       }
@@ -45,8 +48,10 @@ export default async function DriverManifestPage() {
           }
         }
       }
-    }
-  })
+    })
+  } catch (err) {
+    console.error("[DRIVER_MANIFEST_DB_ERROR]", err)
+  }
 
   const assignment = driver?.assignments?.[0]
   const run = assignment?.run

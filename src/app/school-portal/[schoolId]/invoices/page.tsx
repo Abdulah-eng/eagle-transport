@@ -8,30 +8,42 @@ export default async function SchoolInvoicesPage({ params }: { params: Promise<{
   const schoolIdParam = resolvedParams?.schoolId || "";
 
   // Fetch School by ID or Code
-  const school = await prisma.school.findFirst({
-    where: {
-      OR: [
-        { id: schoolIdParam },
-        { code: schoolIdParam.toUpperCase() }
-      ]
+  let school: any = null;
+  let rawInvoices: any[] = [];
+
+  try {
+    if (schoolIdParam) {
+      school = await prisma.school.findFirst({
+        where: {
+          OR: [
+            { id: schoolIdParam },
+            { code: schoolIdParam.toUpperCase() }
+          ]
+        }
+      });
     }
-  });
 
-  const activeSchoolId = school?.id || "";
+    const activeSchoolId = school?.id || "";
 
-  // Fetch Real Invoices from DB for this school
-  const rawInvoices = await prisma.invoice.findMany({
-    where: {
-      OR: [
-        { schoolId: activeSchoolId },
-        { charterTrip: { schoolId: activeSchoolId } }
-      ]
-    },
-    include: {
-      charterTrip: true,
-    },
-    orderBy: { createdAt: "desc" }
-  });
+    // Fetch Real Invoices from DB for this school
+    rawInvoices = await prisma.invoice.findMany({
+      where: {
+        OR: [
+          { schoolId: activeSchoolId },
+          { charterTrip: { schoolId: activeSchoolId } }
+        ]
+      },
+      include: {
+        charterTrip: true,
+      },
+      orderBy: { createdAt: "desc" }
+    });
+  } catch (err) {
+    console.error("[SCHOOL_INVOICES_DB_ERROR]", err);
+  }
+
+  // Safe date helper
+  const toIso = (d: any) => d ? (d instanceof Date ? d.toISOString() : String(d)) : null;
 
   // Serialize Decimal / Date objects for Client Component
   const invoices = rawInvoices.map((inv) => ({
@@ -39,15 +51,15 @@ export default async function SchoolInvoicesPage({ params }: { params: Promise<{
     amount: Number(inv.amount || 0),
     totalAmount: Number(inv.totalAmount || inv.amount || 0),
     taxAmount: Number(inv.taxAmount || 0),
-    createdAt: inv.createdAt.toISOString(),
-    dueDate: inv.dueDate ? inv.dueDate.toISOString() : null,
-    paidAt: inv.paidAt ? inv.paidAt.toISOString() : null,
+    createdAt: toIso(inv.createdAt),
+    dueDate: toIso(inv.dueDate),
+    paidAt: toIso(inv.paidAt),
     charterTrip: inv.charterTrip ? {
       organizationName: inv.charterTrip.organizationName,
       contactName: inv.charterTrip.contactName,
       contactEmail: inv.charterTrip.contactEmail,
       contactPhone: inv.charterTrip.contactPhone,
-      tripDate: inv.charterTrip.tripDate.toISOString(),
+      tripDate: toIso(inv.charterTrip.tripDate),
       pickupAddress: inv.charterTrip.pickupAddress,
       destinationAddress: inv.charterTrip.destinationAddress,
       numberOfBuses: inv.charterTrip.numberOfBuses,

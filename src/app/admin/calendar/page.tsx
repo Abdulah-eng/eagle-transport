@@ -9,34 +9,41 @@ export default async function AdminCalendarPage() {
     redirect("/auth/login")
   }
 
-  const charterTrips = await db.charterTrip.findMany({
-    include: {
-      assignments: {
-        include: {
-          driver: true,
-          bus: true,
-        }
-      }
-    },
-    orderBy: { tripDate: "asc" }
-  })
+  let charterTrips: any[] = []
+  let routes: any[] = []
 
-  const routes = await db.route.findMany({
-    include: {
-      school: true,
-      runs: {
-        include: {
-          stops: true,
-          driverAssignment: {
-            include: {
-              driver: true,
-              bus: true,
+  try {
+    charterTrips = await db.charterTrip.findMany({
+      include: {
+        assignments: {
+          include: {
+            driver: true,
+            bus: true,
+          }
+        }
+      },
+      orderBy: { tripDate: "asc" }
+    })
+
+    routes = await db.route.findMany({
+      include: {
+        school: true,
+        runs: {
+          include: {
+            stops: true,
+            driverAssignment: {
+              include: {
+                driver: true,
+                bus: true,
+              }
             }
           }
         }
       }
-    }
-  })
+    })
+  } catch (err) {
+    console.error("[ADMIN_CALENDAR_DB_ERROR]", err)
+  }
 
   return (
     <OperationsCalendarClient 

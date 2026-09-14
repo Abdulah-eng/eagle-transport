@@ -9,13 +9,18 @@ export default async function AdminAuditLogsPage() {
     redirect("/auth/login")
   }
 
-  const logs = await db.auditLog.findMany({
-    include: {
-      user: true,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  })
+  let logs: any[] = []
+  try {
+    logs = await db.auditLog.findMany({
+      include: {
+        user: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    })
+  } catch (err) {
+    console.error("[ADMIN_AUDIT_LOGS_DB_ERROR]", err)
+  }
 
   return (
     <AuditLogsClient logs={JSON.parse(JSON.stringify(logs))} />

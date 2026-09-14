@@ -9,27 +9,37 @@ export default async function AdminReportsPage() {
     redirect("/auth/login")
   }
 
-  const invoices = await db.invoice.findMany({
-    include: { school: true, parent: true },
-    orderBy: { createdAt: "desc" }
-  })
+  let invoices: any[] = []
+  let students: any[] = []
+  let routes: any[] = []
+  let drivers: any[] = []
+  let incidents: any[] = []
 
-  const students = await db.student.findMany({
-    include: { school: true, registrations: true },
-  })
+  try {
+    invoices = await db.invoice.findMany({
+      include: { school: true, parent: true },
+      orderBy: { createdAt: "desc" }
+    })
 
-  const routes = await db.route.findMany({
-    include: { school: true, runs: { include: { stops: true } } }
-  })
+    students = await db.student.findMany({
+      include: { school: true, registrations: true },
+    })
 
-  const drivers = await db.driver.findMany({
-    include: { assignments: true }
-  })
+    routes = await db.route.findMany({
+      include: { school: true, runs: { include: { stops: true } } }
+    })
 
-  const incidents = await db.incident.findMany({
-    include: { student: true, school: true, driver: true },
-    orderBy: { date: "desc" }
-  })
+    drivers = await db.driver.findMany({
+      include: { assignments: true }
+    })
+
+    incidents = await db.incident.findMany({
+      include: { student: true, school: true, driver: true },
+      orderBy: { date: "desc" }
+    })
+  } catch (err) {
+    console.error("[ADMIN_REPORTS_DB_ERROR]", err)
+  }
 
   return (
     <ReportsClient 

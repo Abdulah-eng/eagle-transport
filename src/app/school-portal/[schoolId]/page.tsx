@@ -13,59 +13,79 @@ export default async function SchoolDashboardPage({ params }: { params: Promise<
   const schoolIdParam = resolvedParams?.schoolId || "";
 
   // Fetch School by ID or code fallback
-  let school = schoolIdParam ? await prisma.school.findFirst({
-    where: {
-      OR: [
-        { id: schoolIdParam },
-        { code: schoolIdParam.toUpperCase() }
-      ]
-    },
-    include: {
-      settings: true,
-      contacts: true,
-      routes: {
+  let school: any = null;
+  try {
+    if (schoolIdParam) {
+      school = await prisma.school.findFirst({
+        where: {
+          OR: [
+            { id: schoolIdParam },
+            { code: schoolIdParam.toUpperCase() }
+          ]
+        },
         include: {
-          runs: true
+          settings: true,
+          contacts: true,
+          routes: {
+            include: { runs: true }
+          }
         }
-      }
+      });
     }
-  }) : null;
 
-  if (!school) {
-    school = await prisma.school.findFirst({
-      include: {
-        settings: true,
-        contacts: true,
-        routes: {
-          include: { runs: true }
+    if (!school) {
+      school = await prisma.school.findFirst({
+        include: {
+          settings: true,
+          contacts: true,
+          routes: {
+            include: { runs: true }
+          }
         }
-      }
-    });
+      });
+    }
+  } catch (err) {
+    console.error("[SCHOOL_DASHBOARD_SCHOOL_ERROR]", err);
   }
 
   const activeSchoolId = school?.id || "";
 
   // Fetch Reporting Metrics
-  const [registeredCount, waitlistedCount, pendingCount, invoices, recentTrips] = await Promise.all([
-    prisma.registration.count({
-      where: { schoolId: activeSchoolId, status: "APPROVED" }
-    }),
-    prisma.registration.count({
-      where: { schoolId: activeSchoolId, status: "WAITLISTED" }
-    }),
-    prisma.registration.count({
-      where: { schoolId: activeSchoolId, status: "PENDING_REVIEW" }
-    }),
-    prisma.invoice.findMany({
-      where: { schoolId: activeSchoolId },
-      orderBy: { createdAt: "desc" }
-    }),
-    prisma.charterTrip.findMany({
-      where: { schoolId: activeSchoolId },
-      orderBy: { tripDate: "asc" },
-      take: 5
-    })
-  ]);
+  let registeredCount = 0;
+  let waitlistedCount = 0;
+  let pendingCount = 0;
+  let invoices: any[] = [];
+  let recentTrips: any[] = [];
+
+  try {
+    const res = await Promise.all([
+      prisma.registration.count({
+        where: { schoolId: activeSchoolId, status: "APPROVED" }
+      }),
+      prisma.registration.count({
+        where: { schoolId: activeSchoolId, status: "WAITLISTED" }
+      }),
+      prisma.registration.count({
+        where: { schoolId: activeSchoolId, status: "PENDING_REVIEW" }
+      }),
+      prisma.invoice.findMany({
+        where: { schoolId: activeSchoolId },
+        orderBy: { createdAt: "desc" }
+      }),
+      prisma.charterTrip.findMany({
+        where: { schoolId: activeSchoolId },
+        orderBy: { tripDate: "asc" },
+        take: 5
+      })
+    ]);
+    registeredCount = res[0];
+    waitlistedCount = res[1];
+    pendingCount = res[2];
+    invoices = res[3] || [];
+    recentTrips = res[4] || [];
+  } catch (err) {
+    console.error("[SCHOOL_DASHBOARD_METRICS_ERROR]", err);
+  }
 
   const unpaidInvoices = invoices.filter(inv => inv.status !== "PAID");
   const totalUnpaidAmount = unpaidInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0);
