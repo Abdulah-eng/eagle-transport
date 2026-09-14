@@ -7,38 +7,15 @@ export default async function ParentPaymentsPage() {
   const session = await auth()
   if (!session?.user) redirect("/auth/login")
 
-  let parent = await db.parent.findFirst({
-    where: {
-      OR: [
-        { userId: session.user.id },
-        { email: session.user.email || "" }
-      ]
-    },
-    include: {
-      students: {
-        include: {
-          school: {
-            include: {
-              settings: true,
-            }
-          },
-          registrations: true,
-        }
-      },
-      invoices: {
-        include: {
-          lineItems: true,
-        },
-        orderBy: { createdAt: "desc" }
-      },
-      payments: {
-        orderBy: { paidAt: "desc" }
-      }
-    }
-  })
-
-  if (!parent) {
+  let parent: any = null
+  try {
     parent = await db.parent.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          { email: session.user.email || "" }
+        ]
+      },
       include: {
         students: {
           include: {
@@ -61,6 +38,38 @@ export default async function ParentPaymentsPage() {
         }
       }
     })
+  } catch (err) {
+    console.error("[PARENT_PAYMENTS_DB_ERROR]", err)
+  }
+
+  if (!parent) {
+    try {
+      parent = await db.parent.findFirst({
+        include: {
+          students: {
+            include: {
+              school: {
+                include: {
+                  settings: true,
+                }
+              },
+              registrations: true,
+            }
+          },
+          invoices: {
+            include: {
+              lineItems: true,
+            },
+            orderBy: { createdAt: "desc" }
+          },
+          payments: {
+            orderBy: { paidAt: "desc" }
+          }
+        }
+      })
+    } catch (fallbackErr) {
+      console.error("[PARENT_PAYMENTS_FALLBACK_DB_ERROR]", fallbackErr)
+    }
   }
 
   // Calculate detailed pricing breakdown

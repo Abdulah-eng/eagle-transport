@@ -12,62 +12,16 @@ export default async function ParentDashboardPage() {
   const session = await auth()
   if (!session?.user) redirect("/auth/login")
 
-  // Find parent record by userId or email
-  let parent = await db.parent.findFirst({
-    where: {
-      OR: [
-        { userId: session.user.id },
-        { email: session.user.email || "" }
-      ]
-    },
-    include: {
-      students: {
-        include: {
-          school: true,
-          emergencyContacts: true,
-          registrations: {
-            include: {
-              routeAssignment: {
-                include: {
-                  stop: {
-                    include: {
-                      run: {
-                        include: {
-                          route: true,
-                          driverAssignment: {
-                            include: {
-                              driver: true,
-                              bus: true,
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          attendances: {
-            orderBy: { date: "desc" },
-            take: 3,
-          }
-        }
-      },
-      invoices: {
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      },
-      payments: {
-        orderBy: { paidAt: "desc" },
-        take: 5,
-      }
-    }
-  })
-
-  // If no parent record found (e.g., admin previewing), get first parent or mock
-  if (!parent) {
+  // Find parent record by userId or email with error handling
+  let parent: any = null
+  try {
     parent = await db.parent.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          { email: session.user.email || "" }
+        ]
+      },
       include: {
         students: {
           include: {
@@ -112,10 +66,66 @@ export default async function ParentDashboardPage() {
         }
       }
     })
+  } catch (dbErr) {
+    console.error("[PARENT_DASHBOARD_DB_ERROR]", dbErr)
+  }
+
+  // If no parent record found (e.g., admin previewing), get first parent or fallback
+  if (!parent) {
+    try {
+      parent = await db.parent.findFirst({
+        include: {
+          students: {
+            include: {
+              school: true,
+              emergencyContacts: true,
+              registrations: {
+                include: {
+                  routeAssignment: {
+                    include: {
+                      stop: {
+                        include: {
+                          run: {
+                            include: {
+                              route: true,
+                              driverAssignment: {
+                                include: {
+                                  driver: true,
+                                  bus: true,
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              attendances: {
+                orderBy: { date: "desc" },
+                take: 3,
+              }
+            }
+          },
+          invoices: {
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          },
+          payments: {
+            orderBy: { paidAt: "desc" },
+            take: 5,
+          }
+        }
+      })
+    } catch (fallbackErr) {
+      console.error("[PARENT_DASHBOARD_FALLBACK_DB_ERROR]", fallbackErr)
+    }
   }
 
   const students = parent?.students || []
-  const hasPastDue = parent?.invoices.some((inv) => inv.status === "OVERDUE") || false
+  const invoices = parent?.invoices || []
+  const hasPastDue = Array.isArray(invoices) && invoices.some((inv: any) => inv?.status === "OVERDUE")
 
   return (
     <div className="space-y-6">

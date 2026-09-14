@@ -7,17 +7,26 @@ export default async function ParentProfilePage() {
   const session = await auth()
   if (!session?.user) redirect("/auth/login")
 
-  let parent = await db.parent.findFirst({
-    where: {
-      OR: [
-        { userId: session.user.id },
-        { email: session.user.email || "" }
-      ]
-    }
-  })
+  let parent: any = null
+  try {
+    parent = await db.parent.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          { email: session.user.email || "" }
+        ]
+      }
+    })
+  } catch (err) {
+    console.error("[PARENT_PROFILE_DB_ERROR]", err)
+  }
 
   if (!parent) {
-    parent = await db.parent.findFirst()
+    try {
+      parent = await db.parent.findFirst()
+    } catch (fallbackErr) {
+      console.error("[PARENT_PROFILE_FALLBACK_DB_ERROR]", fallbackErr)
+    }
   }
 
   return (

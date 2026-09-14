@@ -7,41 +7,52 @@ import { Button } from "@/components/ui/button";
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const [
-    pendingRegistrationsCount,
-    waitlistRegistrationsCount,
-    newCharterTripsCount,
-    totalBusesCount,
-    recentPublicTrips,
-    recentRegistrations,
-    schools
-  ] = await Promise.all([
-    prisma.registration.count({ where: { status: "PENDING_REVIEW" } }),
-    prisma.registration.count({ where: { status: "WAITLISTED" } }),
-    prisma.charterTrip.count({ where: { status: "NEW" } }),
-    prisma.bus.count(),
-    prisma.charterTrip.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 5
-    }),
-    prisma.registration.findMany({
-      take: 5,
-      orderBy: { submittedAt: "desc" },
-      include: {
-        student: true,
-        school: true
-      }
-    }),
-    prisma.school.findMany({
-      take: 4,
-      include: {
-        settings: true,
-        _count: {
-          select: { registrations: true }
+  let pendingRegistrationsCount = 0;
+  let waitlistRegistrationsCount = 0;
+  let newCharterTripsCount = 0;
+  let totalBusesCount = 0;
+  let recentPublicTrips: any[] = [];
+  let recentRegistrations: any[] = [];
+  let schools: any[] = [];
+
+  try {
+    const res = await Promise.all([
+      prisma.registration.count({ where: { status: "PENDING_REVIEW" } }),
+      prisma.registration.count({ where: { status: "WAITLISTED" } }),
+      prisma.charterTrip.count({ where: { status: "NEW" } }),
+      prisma.bus.count(),
+      prisma.charterTrip.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 5
+      }),
+      prisma.registration.findMany({
+        take: 5,
+        orderBy: { submittedAt: "desc" },
+        include: {
+          student: true,
+          school: true
         }
-      }
-    })
-  ]);
+      }),
+      prisma.school.findMany({
+        take: 4,
+        include: {
+          settings: true,
+          _count: {
+            select: { registrations: true }
+          }
+        }
+      })
+    ]);
+    pendingRegistrationsCount = res[0];
+    waitlistRegistrationsCount = res[1];
+    newCharterTripsCount = res[2];
+    totalBusesCount = res[3];
+    recentPublicTrips = res[4] || [];
+    recentRegistrations = res[5] || [];
+    schools = res[6] || [];
+  } catch (err) {
+    console.error("[ADMIN_DASHBOARD_DB_ERROR]", err);
+  }
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">

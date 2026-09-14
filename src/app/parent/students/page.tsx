@@ -10,48 +10,15 @@ export default async function ParentStudentsPage() {
   const session = await auth()
   if (!session?.user) redirect("/auth/login")
 
-  let parent = await db.parent.findFirst({
-    where: {
-      OR: [
-        { userId: session.user.id },
-        { email: session.user.email || "" }
-      ]
-    },
-    include: {
-      students: {
-        include: {
-          school: true,
-          emergencyContacts: true,
-          registrations: {
-            include: {
-              routeAssignment: {
-                include: {
-                  stop: {
-                    include: {
-                      run: {
-                        include: {
-                          route: true,
-                          driverAssignment: {
-                            include: {
-                              driver: true,
-                              bus: true,
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  })
-
-  if (!parent) {
+  let parent: any = null
+  try {
     parent = await db.parent.findFirst({
+      where: {
+        OR: [
+          { userId: session.user.id },
+          { email: session.user.email || "" }
+        ]
+      },
       include: {
         students: {
           include: {
@@ -84,6 +51,48 @@ export default async function ParentStudentsPage() {
         }
       }
     })
+  } catch (err) {
+    console.error("[PARENT_STUDENTS_DB_ERROR]", err)
+  }
+
+  if (!parent) {
+    try {
+      parent = await db.parent.findFirst({
+        include: {
+          students: {
+            include: {
+              school: true,
+              emergencyContacts: true,
+              registrations: {
+                include: {
+                  routeAssignment: {
+                    include: {
+                      stop: {
+                        include: {
+                          run: {
+                            include: {
+                              route: true,
+                              driverAssignment: {
+                                include: {
+                                  driver: true,
+                                  bus: true,
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
+    } catch (fallbackErr) {
+      console.error("[PARENT_STUDENTS_FALLBACK_DB_ERROR]", fallbackErr)
+    }
   }
 
   const students = parent?.students || []
