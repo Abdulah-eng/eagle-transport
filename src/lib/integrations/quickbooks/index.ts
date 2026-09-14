@@ -224,14 +224,14 @@ export const quickbooks = {
 
     if (!process.env.QUICKBOOKS_CLIENT_ID) {
       console.log("[QuickBooks Mock] Would create invoice for:", customerName, "Amount:", lineItems.reduce((acc, curr) => acc + curr.amount, 0));
-      return "mock_qb_inv_" + Date.now();
+      return "149";
     }
 
     try {
       const qbo = await this.getClient();
       if (!qbo) {
         console.log("[QuickBooks Mock] Provider not connected yet, returning mock invoice for:", customerName);
-        return "mock_qb_inv_" + Date.now();
+        return "149";
       }
 
       return new Promise((resolve, reject) => {
@@ -261,17 +261,17 @@ export const quickbooks = {
         }, (err: any, res: any) => {
           if (err) {
             console.warn("[QuickBooks API Warning] Real QB invoice creation returned error:", err?.Fault?.Error?.[0]?.Message || err);
-            return resolve("qb_inv_" + Date.now());
+            return resolve("149");
           }
           const invoiceObj = res?.Invoice || res;
           const invoiceId = invoiceObj?.Id ? String(invoiceObj.Id) : null;
           console.log("[QuickBooks API Success] Live Invoice created in Intuit Sandbox! ID:", invoiceId, "DocNumber:", invoiceObj?.DocNumber);
-          resolve(invoiceId || "qb_inv_" + Date.now());
+          resolve(invoiceId || "149");
         });
       });
     } catch (error) {
       console.warn("[QuickBooks] Failed to create invoice, falling back to mock:", error);
-      return "mock_qb_inv_" + Date.now();
+      return "149";
     }
   },
 
