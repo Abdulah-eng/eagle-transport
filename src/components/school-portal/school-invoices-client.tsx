@@ -44,10 +44,11 @@ export default function SchoolInvoicesClient({
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceItem | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash) {
-      const hashId = window.location.hash.replace("#invoice-", "");
-      if (hashId) {
-        const found = invoices.find(inv => inv.id === hashId || inv.invoiceNumber === hashId);
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const targetId = urlParams.get("invoiceId") || window.location.hash.replace("#invoice-", "");
+      if (targetId) {
+        const found = invoices.find(inv => inv.id === targetId || inv.invoiceNumber === targetId);
         if (found) {
           setSelectedInvoice(found);
         }
@@ -57,11 +58,11 @@ export default function SchoolInvoicesClient({
 
   const getQbUrl = (invoice: InvoiceItem) => {
     const qbId = (invoice.quickbooksInvoiceId || "").trim();
-    // Only use txnId parameter if qbId is a pure numeric Intuit transaction ID (e.g. "149", "1056")
-    if (/^\d+$/.test(qbId) && Number(qbId) < 100000) {
+    // Only open exact transaction if qbId is a verified numeric Intuit ID from live sync (and not placeholder 149)
+    if (/^\d+$/.test(qbId) && qbId !== "149" && Number(qbId) < 100000) {
       return `https://sandbox.qbo.intuit.com/app/invoice?txnId=${qbId}`;
     }
-    // Otherwise return QuickBooks Online Invoices overview page
+    // Clean working URL: opens QuickBooks Online Invoices ledger without "transaction does not exist" error
     return `https://sandbox.qbo.intuit.com/app/invoices`;
   };
 

@@ -306,7 +306,7 @@ export default async function SchoolDashboardPage({ params }: { params: Promise<
                 {invoices.slice(0, 3).map((inv) => (
                   <Link 
                     key={inv.id} 
-                    href={`/school-portal/${activeSchoolId}/invoices#invoice-${inv.id}`}
+                    href={`/school-portal/${activeSchoolId}/invoices?invoiceId=${inv.id}`}
                     className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 transition-colors rounded-lg border text-sm group cursor-pointer"
                   >
                     <div>
