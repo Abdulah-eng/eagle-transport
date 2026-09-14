@@ -41,6 +41,7 @@ export default async function SchoolDashboardPage({ params }: { params: Promise<
           routes: {
             include: { runs: true }
           }
+        }
       });
     }
   } catch (err) {
