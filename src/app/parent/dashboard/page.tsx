@@ -203,7 +203,7 @@ export default async function ParentDashboardPage() {
               <p className="text-xs">If you submitted a registration, our office team will process it shortly.</p>
             </div>
           ) : (
-            students.map((student) => {
+            students.map((student: any) => {
               const activeReg = student.registrations[0]
               const stopAssignment = activeReg?.routeAssignment?.stop
               const run = stopAssignment?.run
@@ -291,7 +291,7 @@ export default async function ParentDashboardPage() {
                         Recent Bus Attendance Log
                       </div>
                       <div className="space-y-1.5">
-                        {student.attendances.map((att) => (
+                        {student.attendances.map((att: any) => (
                           <div key={att.id} className="flex items-center justify-between text-xs p-2 rounded bg-muted/20">
                             <span className="font-medium text-foreground">
                               {new Date(att.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ({att.runType})

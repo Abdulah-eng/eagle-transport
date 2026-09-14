@@ -78,7 +78,7 @@ export default async function ParentPaymentsPage() {
   let totalDiscountAmount = 0
 
   if (parent?.students) {
-    parent.students.forEach((student, index) => {
+    parent.students.forEach((student: any, index: number) => {
       const activeReg = student.registrations[0]
       const settings = student.school?.settings
 

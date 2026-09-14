@@ -117,7 +117,7 @@ export default async function ParentStudentsPage() {
           </p>
         </div>
       ) : (
-        students.map((student) => {
+        students.map((student: any) => {
           const activeReg = student.registrations[0]
           const stop = activeReg?.routeAssignment?.stop
           const run = stop?.run
@@ -251,7 +251,7 @@ export default async function ParentStudentsPage() {
                   <p className="text-xs text-muted-foreground">No secondary emergency contacts listed.</p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {student.emergencyContacts.map((contact) => (
+                    {student.emergencyContacts.map((contact: any) => (
                       <div key={contact.id} className="p-3 bg-muted/20 border border-border/60 rounded-lg text-xs space-y-1">
                         <div className="font-bold text-foreground">{contact.name} ({contact.relationship})</div>
                         <div className="text-muted-foreground">Phone: {contact.phone}</div>
