@@ -37,31 +37,42 @@ function getOAuth2Client() {
 async function getAuthenticatedClient() {
   const oauth2Client = getOAuth2Client();
 
-  // Try to load saved tokens from DB
-  const integration = await prisma.integration.findUnique({
-    where: { provider: "google_calendar" },
-  });
+  let integration: any = null;
+  try {
+    integration = await prisma.integration.findUnique({
+      where: { provider: "google_calendar" },
+    });
+  } catch (err) {
+    console.warn("[Google Calendar] Prisma query failed, trying Supabase REST API:", err);
+  }
+
+  if (!integration && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations?provider=eq.google_calendar&select=*`, {
+        headers: {
+          'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+        }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows && rows.length > 0) integration = rows[0];
+      }
+    } catch (e) {
+      console.error("[Google Calendar] Supabase REST API fallback failed:", e);
+    }
+  }
 
   if (!integration?.accessToken) {
     throw new Error("Google Calendar not connected. Please authorize via /api/calendar/auth");
   }
 
+  const expiryDate = integration.expiresAt ? new Date(integration.expiresAt).getTime() : undefined;
+
   oauth2Client.setCredentials({
     access_token: integration.accessToken,
     refresh_token: integration.refreshToken || undefined,
-    expiry_date: integration.expiresAt?.getTime(),
-  });
-
-  // Auto-refresh token if needed
-  oauth2Client.on("tokens", async (tokens) => {
-    await prisma.integration.update({
-      where: { provider: "google_calendar" },
-      data: {
-        accessToken: tokens.access_token || undefined,
-        refreshToken: tokens.refresh_token || undefined,
-        expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
-      },
-    });
+    expiry_date: expiryDate,
   });
 
   return oauth2Client;
@@ -99,20 +110,52 @@ export const googleCalendar = {
   async handleCallback(code: string): Promise<void> {
     const oauth2Client = getOAuth2Client();
     const { tokens } = await oauth2Client.getToken(code);
-    await prisma.integration.upsert({
-      where: { provider: "google_calendar" },
-      create: {
-        provider: "google_calendar",
-        accessToken: tokens.access_token || undefined,
-        refreshToken: tokens.refresh_token || undefined,
-        expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
-      },
-      update: {
-        accessToken: tokens.access_token || undefined,
-        refreshToken: tokens.refresh_token || undefined,
-        expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
-      },
-    });
+
+    const data = {
+      provider: "google_calendar",
+      accessToken: tokens.access_token || null,
+      refreshToken: tokens.refresh_token || null,
+      expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+      updatedAt: new Date(),
+    };
+
+    let upserted = false;
+    try {
+      await prisma.integration.upsert({
+        where: { provider: "google_calendar" },
+        create: {
+          provider: "google_calendar",
+          accessToken: tokens.access_token || undefined,
+          refreshToken: tokens.refresh_token || undefined,
+          expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
+        },
+        update: {
+          accessToken: tokens.access_token || undefined,
+          refreshToken: tokens.refresh_token || undefined,
+          expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
+        },
+      });
+      upserted = true;
+    } catch (dbErr) {
+      console.warn("[Google Calendar] Prisma upsert failed, trying Supabase REST API:", dbErr);
+    }
+
+    if (!upserted && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations`, {
+          method: 'POST',
+          headers: {
+            'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(data)
+        });
+      } catch (e) {
+        console.error("[Google Calendar] Supabase REST API upsert fallback failed:", e);
+      }
+    }
   },
 
   async createTripEvent(data: TripEventData): Promise<string | null> {
