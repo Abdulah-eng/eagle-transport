@@ -33,7 +33,8 @@ export default function Footer() {
               <li><Link href="/parent/dashboard" className="hover:text-primary transition-colors">Parent Pay Portal</Link></li>
               <li><Link href="/school-portal" className="hover:text-primary transition-colors">School Partner Portals</Link></li>
               <li><Link href="/rules" className="hover:text-primary transition-colors">School & Group Rules</Link></li>
-              <li><Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy (EBSPrivacyPolicy)</Link></li>
+              <li><Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link></li>
             </ul>
           </div>
 
@@ -79,9 +80,11 @@ export default function Footer() {
             Copyright © 2026 Eagle Bus Service - All Rights Reserved.
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/privacy-policy" className="hover:underline">EBSPrivacyPolicy</Link>
+            <Link href="/privacy-policy" className="hover:underline">Privacy Policy</Link>
             <span>•</span>
-            <Link href="/rules" className="hover:underline">School Rules & Policies</Link>
+            <Link href="/terms-of-service" className="hover:underline">Terms of Service</Link>
+            <span>•</span>
+            <Link href="/rules" className="hover:underline">School Rules</Link>
           </div>
         </div>
       </div>
