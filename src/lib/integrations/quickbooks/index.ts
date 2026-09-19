@@ -222,16 +222,22 @@ export const quickbooks = {
         integration = await this.refreshTokens(integration.refreshToken);
         console.log("[QuickBooks] Access token successfully refreshed!");
       } catch (err) {
-        console.error("[QuickBooks] Auto-refresh token failed:", err);
-      }
-    }
-    if (isExpired && integration.refreshToken) {
-      try {
-        console.log("[QuickBooks] Access token expired, refreshing via Intuit OAuth...");
-        integration = await this.refreshTokens(integration.refreshToken);
-        console.log("[QuickBooks] Access token successfully refreshed!");
-      } catch (err) {
-        console.error("[QuickBooks] Auto-refresh token failed:", err);
+        console.error("[QuickBooks] Auto-refresh token failed (credentials may have changed). Clearing stale integration record:", err);
+        try {
+          await prisma.integration.deleteMany({ where: { provider: "quickbooks" } });
+        } catch {}
+        if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+          try {
+            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/integrations?provider=eq.quickbooks`, {
+              method: 'DELETE',
+              headers: {
+                'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+              }
+            });
+          } catch {}
+        }
+        return null;
       }
     }
 

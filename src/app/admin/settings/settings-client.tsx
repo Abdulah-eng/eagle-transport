@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   Settings, ShieldCheck, Key, RefreshCw, CheckCircle2, 
-  AlertTriangle, Database, Lock, Server, Cpu, Globe
+  AlertTriangle, Database, Lock, Server, Cpu, Globe, LogOut, Link2
 } from "lucide-react"
 
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 
 interface SettingsClientProps {
   envCheck: Record<string, boolean>
@@ -15,9 +15,16 @@ interface SettingsClientProps {
 
 export default function SettingsClient({ envCheck, integrations }: SettingsClientProps) {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const [activeIntegrations, setActiveIntegrations] = useState<any[]>(integrations)
   const [testingConnection, setTestingConnection] = useState<string | null>(null)
+  const [disconnecting, setDisconnecting] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(searchParams.get("toast"))
   const [errorToast, setErrorToast] = useState<string | null>(searchParams.get("error"))
+
+  useEffect(() => {
+    setActiveIntegrations(integrations)
+  }, [integrations])
 
   const handleTestIntegration = (name: string) => {
     setTestingConnection(name)
@@ -28,14 +35,44 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
     }, 1200)
   }
 
+  const handleDisconnect = async (provider: string, label: string) => {
+    if (!confirm(`Are you sure you want to disconnect ${label}? This will remove stored access tokens.`)) {
+      return
+    }
+    setDisconnecting(provider)
+    try {
+      const res = await fetch("/api/integrations/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setActiveIntegrations(prev => prev.filter(i => i.provider !== provider && i.provider !== (provider === "google_calendar" ? "google" : provider)))
+        setToast(`${label} disconnected successfully. You can now re-connect with new credentials.`)
+        router.refresh()
+      } else {
+        setErrorToast(data.error || `Failed to disconnect ${label}`)
+      }
+    } catch (err) {
+      setErrorToast(`Failed to disconnect ${label}`)
+    } finally {
+      setDisconnecting(null)
+      setTimeout(() => {
+        setToast(null)
+        setErrorToast(null)
+      }, 4000)
+    }
+  }
+
   const isQuickbooksConnected =
-    integrations.some((i) => 
+    activeIntegrations.some((i) => 
       (i.provider === "quickbooks") && 
       (i.accessToken || i.access_token || i.is_connected || i.refreshToken || i.refresh_token)
     )
 
   const isGoogleConnected = 
-    integrations.some((i) => 
+    activeIntegrations.some((i) => 
       (i.provider === "google_calendar" || i.provider === "google") && 
       (i.accessToken || i.access_token || i.is_connected || i.refreshToken || i.refresh_token)
     )
@@ -93,12 +130,27 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
                 <div className="text-xs text-muted-foreground">Automated customer invoices & charter billing</div>
               </div>
               {isQuickbooksConnected ? (
-                <button
-                  disabled
-                  className="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-semibold rounded-lg flex items-center gap-1"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Connected
-                </button>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-semibold rounded-lg flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Connected
+                  </span>
+                  <a
+                    href="/api/integrations/quickbooks/auth"
+                    className="px-2.5 py-1 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                    title="Reconnect using current credentials in .env"
+                  >
+                    <Link2 className="w-3.5 h-3.5" /> Reconnect
+                  </a>
+                  <button
+                    onClick={() => handleDisconnect("quickbooks", "QuickBooks Online")}
+                    disabled={disconnecting === "quickbooks"}
+                    className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                    title="Disconnect QuickBooks"
+                  >
+                    {disconnecting === "quickbooks" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                    Disconnect
+                  </button>
+                </div>
               ) : (
                 <a
                   href="/api/integrations/quickbooks/auth"
@@ -115,12 +167,27 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
                 <div className="text-xs text-muted-foreground">Charter trip dispatch synchronization</div>
               </div>
               {isGoogleConnected ? (
-                <button
-                  disabled
-                  className="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-semibold rounded-lg flex items-center gap-1"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Connected
-                </button>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-semibold rounded-lg flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Connected
+                  </span>
+                  <a
+                    href="/api/integrations/google-calendar/auth"
+                    className="px-2.5 py-1 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                    title="Reconnect using current credentials in .env"
+                  >
+                    <Link2 className="w-3.5 h-3.5" /> Reconnect
+                  </a>
+                  <button
+                    onClick={() => handleDisconnect("google_calendar", "Google Calendar")}
+                    disabled={disconnecting === "google_calendar"}
+                    className="px-2.5 py-1 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1"
+                    title="Disconnect Google Calendar"
+                  >
+                    {disconnecting === "google_calendar" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                    Disconnect
+                  </button>
+                </div>
               ) : (
                 <a
                   href="/api/integrations/google-calendar/auth"
