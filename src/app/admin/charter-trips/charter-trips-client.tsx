@@ -133,25 +133,24 @@ export default function CharterTripsClient({
         </div>
       </div>
 
-      {/* Filters & Search */}
-      <div className="bg-card border border-border rounded-xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between shadow-sm">
-        <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+      {/* Search & Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 bg-card p-4 rounded-xl border border-border shadow-sm">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Search className="w-5 h-5 text-muted-foreground shrink-0" />
           <input
             type="text"
             placeholder="Search organization, contact name, or destination..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="flex-1 min-w-0 bg-transparent border-none text-sm focus:outline-none"
           />
         </div>
-
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <Filter className="w-4 h-4 text-muted-foreground" />
+        <div className="flex items-center gap-2 border-t sm:border-t-0 sm:border-l border-border pt-3 sm:pt-0 sm:pl-4">
+          <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full sm:w-auto px-3 py-2 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           >
             <option value="ALL">All Charter Statuses</option>
             <option value="NEW">New Requests</option>

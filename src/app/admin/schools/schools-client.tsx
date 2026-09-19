@@ -247,7 +247,7 @@ export default function SchoolsClient({ schools: initialSchools }: SchoolsClient
               </CardHeader>
 
               <CardContent className="pt-6">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 sm:gap-6">
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Status</p>
                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold ${

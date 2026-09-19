@@ -194,8 +194,8 @@ export default function SchoolInvoicesClient({
 
       {/* Invoice Detail / Statement Modal */}
       {selectedInvoice && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 p-8 space-y-6 relative text-slate-900">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 p-4 sm:p-8 space-y-4 sm:space-y-6 relative text-slate-900">
             <button 
               onClick={() => setSelectedInvoice(null)}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors print:hidden"
@@ -204,24 +204,24 @@ export default function SchoolInvoicesClient({
             </button>
 
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 pb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4 sm:pb-6">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm">
+                <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm shrink-0">
                   <Bus className="h-7 w-7" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black font-heading text-slate-900">Eagle Bus Transportation</h2>
+                  <h2 className="text-xl sm:text-2xl font-black font-heading text-slate-900">Eagle Bus Transportation</h2>
                   <p className="text-xs text-slate-500">Official Charter Billing Statement</p>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Invoice #</span>
-                <div className="text-lg font-mono font-black text-slate-900">{selectedInvoice.invoiceNumber}</div>
+                <div className="text-base sm:text-lg font-mono font-black text-slate-900">{selectedInvoice.invoiceNumber}</div>
               </div>
             </div>
 
             {/* Bill To & Details Grid */}
-            <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm">
               <div>
                 <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Billed To</span>
                 <p className="font-bold text-slate-900 mt-1">{selectedInvoice.billingName || schoolName}</p>
