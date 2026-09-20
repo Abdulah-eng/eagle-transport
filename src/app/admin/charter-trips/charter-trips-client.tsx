@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { 
   Bus, Calendar, DollarSign, Users, CheckCircle2, 
   Clock, Search, Plus, Filter, FileText, Send, 
-  UserCheck, RefreshCw, ShieldAlert, Sparkles, MapPin
+  UserCheck, RefreshCw, ShieldAlert, Sparkles, MapPin, Flag
 } from "lucide-react"
 
 interface CharterTripsClientProps {
@@ -250,7 +250,7 @@ export default function CharterTripsClient({
                       </td>
 
                       <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5 flex-wrap">
                           {/* Quote Action */}
                           <button
                             onClick={() => {
@@ -285,8 +285,26 @@ export default function CharterTripsClient({
                             className="px-2.5 py-1.5 border border-purple-200 text-purple-700 hover:bg-purple-50 rounded text-xs font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
                             title="Generate QuickBooks Invoice"
                           >
-                            <FileText className="w-3.5 h-3.5" /> QB Invoice
+                            {loadingAction === `create_qb_invoice-${trip.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                            QB Invoice
                           </button>
+
+                          {/* Complete Trip — triggers review request email */}
+                          {(trip.status === "SCHEDULED" || trip.status === "INVOICED" || trip.status === "QUOTED") && (
+                            <button
+                              disabled={loadingAction === `update_status-${trip.id}`}
+                              onClick={() => {
+                                if (confirm(`Mark "${trip.organizationName}" as COMPLETED? A review request will be emailed to the contact.`)) {
+                                  handleExecuteAction("update_status", { tripId: trip.id, status: "COMPLETED" })
+                                }
+                              }}
+                              className="px-2.5 py-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded text-xs font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
+                              title="Mark as Completed & Send Review Request"
+                            >
+                              {loadingAction === `update_status-${trip.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Flag className="w-3.5 h-3.5" />}
+                              Complete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

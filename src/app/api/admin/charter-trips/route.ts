@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth/config"
 import { googleCalendarService } from "@/lib/integrations/google-calendar"
 import { quickbooksService } from "@/lib/integrations/quickbooks"
 import { messagingService } from "@/lib/integrations/messaging"
+import { prisma } from "@/lib/db/client"
 
 export async function GET(req: Request) {
   try {
@@ -251,9 +252,59 @@ export async function POST(req: Request) {
         }
       } catch {}
 
+      // Notify assigned driver via email + SMS
+      if (driverId) {
+        try {
+          let driver: any = null
+          try {
+            driver = await db.driver.findUnique({ where: { id: driverId } })
+          } catch {}
+
+          if (driver) {
+            const tripDate = new Date(trip.tripDate)
+            const dateStr = tripDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+            const htmlBody = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #1e40af; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+                  <h2 style="margin: 0;">Eagle Bus — New Trip Assignment</h2>
+                </div>
+                <div style="padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
+                  <p>Hello <strong>${driver.firstName}</strong>,</p>
+                  <p>You have been assigned to the following charter trip:</p>
+                  <table style="width: 100%; border-collapse: collapse; margin: 12px 0;">
+                    <tr><td style="padding: 8px; color: #64748b; border-bottom: 1px solid #e2e8f0;">Organization</td><td style="padding: 8px; font-weight: 600; border-bottom: 1px solid #e2e8f0;">${trip.organizationName}</td></tr>
+                    <tr><td style="padding: 8px; color: #64748b; border-bottom: 1px solid #e2e8f0;">Date</td><td style="padding: 8px; font-weight: 600; border-bottom: 1px solid #e2e8f0;">${dateStr}</td></tr>
+                    <tr><td style="padding: 8px; color: #64748b; border-bottom: 1px solid #e2e8f0;">Pickup</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${trip.pickupAddress}</td></tr>
+                    <tr><td style="padding: 8px; color: #64748b;">Destination</td><td style="padding: 8px;">${trip.destinationName || trip.destinationAddress}</td></tr>
+                  </table>
+                  ${notes ? `<p><strong>Instructions:</strong> ${notes}</p>` : ""}
+                  <p style="margin-top: 16px; font-size: 13px; color: #64748b;">Eagle Bus Transportation — theeaglebus.com</p>
+                </div>
+              </div>`
+
+            await messagingService.sendEmail(
+              driver.email,
+              `Trip Assignment: ${trip.organizationName} — ${dateStr}`,
+              `Eagle Bus Trip Assignment\nOrganization: ${trip.organizationName}\nDate: ${dateStr}\nPickup: ${trip.pickupAddress}\nDestination: ${trip.destinationName || trip.destinationAddress}`,
+              htmlBody
+            )
+
+            // SMS notification
+            if (driver.phone) {
+              await messagingService.sendSMS(
+                driver.phone,
+                `Eagle Bus: You are assigned to ${trip.organizationName} on ${dateStr}. Pickup: ${trip.pickupAddress}. Check your email for details.`
+              )
+            }
+          }
+        } catch (notifyErr) {
+          console.warn("[CHARTER_TRIPS_POST] Driver notification failed (non-blocking):", notifyErr)
+        }
+      }
+
       return NextResponse.json({
         success: true,
-        message: "Driver and bus assigned successfully. Trip synced to Google Calendar."
+        message: "Driver and bus assigned successfully. Trip synced to Google Calendar. Driver notified."
       })
     }
 
@@ -345,9 +396,47 @@ export async function POST(req: Request) {
         } catch {}
       }
 
+      // Email invoice to billing contact
+      try {
+        const billingEmail = trip.billingEmail || trip.contactEmail
+        const billingName = trip.billingName || trip.organizationName
+        const qbInvoiceUrl = qbInvoiceId
+          ? `https://sandbox.qbo.intuit.com/app/invoice?txnId=${qbInvoiceId}`
+          : null
+
+        const htmlInvoiceEmail = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #7c3aed; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+              <h2 style="margin: 0;">Eagle Bus — Invoice Ready</h2>
+            </div>
+            <div style="padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
+              <p>Dear <strong>${billingName}</strong>,</p>
+              <p>An invoice has been generated for your upcoming charter trip.</p>
+              <div style="background: #ede9fe; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                <div style="font-size: 13px; color: #6d28d9;">Invoice #</div>
+                <div style="font-size: 20px; font-weight: bold; color: #4c1d95;">${invNumber}</div>
+                <div style="font-size: 24px; font-weight: bold; color: #7c3aed; margin-top: 8px;">$${amount.toFixed(2)}</div>
+                <div style="font-size: 12px; color: #6d28d9; margin-top: 4px;">Due within 7 days</div>
+              </div>
+              ${qbInvoiceUrl ? `<p><a href="${qbInvoiceUrl}" style="background: #7c3aed; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">View Invoice in QuickBooks</a></p>` : ""}
+              <p>If you have any questions about this invoice, please contact us at <a href="mailto:billing@eaglebus.com">billing@eaglebus.com</a>.</p>
+              <p style="margin-top: 16px; font-size: 13px; color: #64748b;">Eagle Bus Transportation — theeaglebus.com</p>
+            </div>
+          </div>`
+
+        await messagingService.sendEmail(
+          billingEmail,
+          `Invoice Ready — ${trip.organizationName} Charter Trip (${invNumber})`,
+          `Dear ${billingName},\n\nYour invoice ${invNumber} for $${amount.toFixed(2)} is ready for the ${trip.organizationName} charter trip.${qbInvoiceUrl ? `\n\nView in QuickBooks: ${qbInvoiceUrl}` : ""}\n\nThank you for choosing Eagle Bus!`,
+          htmlInvoiceEmail
+        )
+      } catch (invoiceEmailErr) {
+        console.warn("[CHARTER_TRIPS_POST] Invoice email send failed (non-blocking):", invoiceEmailErr)
+      }
+
       return NextResponse.json({
         success: true,
-        message: "QuickBooks Invoice generated and linked to charter trip.",
+        message: "QuickBooks Invoice generated. Billing contact emailed.",
         invoice: invoicePayload
       })
     }
@@ -381,7 +470,75 @@ export async function POST(req: Request) {
         } catch {}
       }
 
-      return NextResponse.json({ success: true, message: `Trip status updated to ${status}` })
+      // When trip is COMPLETED — create a review request and email the contact
+      if (status === "COMPLETED") {
+        try {
+          const reviewToken = `rvw_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://eaglebusconnect.com"
+          const reviewUrl = `${appUrl}/review?tripId=${tripId}&token=${reviewToken}`
+
+          // Create the ReviewRequest record
+          try {
+            const existing = await prisma.reviewRequest.findUnique({ where: { charterTripId: tripId } })
+            if (!existing) {
+              await prisma.reviewRequest.create({
+                data: { charterTripId: tripId, token: reviewToken }
+              })
+            }
+          } catch {}
+
+          // Supabase REST fallback for ReviewRequest
+          if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            try {
+              await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/review_requests`, {
+                method: 'POST',
+                headers: {
+                  'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                  'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'resolution=merge-duplicates'
+                },
+                body: JSON.stringify({
+                  id: `rev_${Date.now()}`,
+                  charterTripId: tripId,
+                  token: reviewToken,
+                  createdAt: new Date().toISOString()
+                })
+              })
+            } catch {}
+          }
+
+          // Send review request email
+          const reviewHtml = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: #1e40af; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+                <h2 style="margin: 0;">How Was Your Eagle Bus Trip?</h2>
+              </div>
+              <div style="padding: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
+                <p>Hello <strong>${trip.contactName}</strong>,</p>
+                <p>Thank you for choosing Eagle Bus for your <strong>${trip.organizationName}</strong> charter trip!</p>
+                <p>We'd love to hear about your experience. It only takes 30 seconds:</p>
+                <div style="text-align: center; margin: 24px 0;">
+                  <a href="${reviewUrl}" style="background: #1e40af; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">⭐ Rate Your Experience</a>
+                </div>
+                <p style="font-size: 13px; color: #64748b;">If the button doesn't work, copy and paste this link into your browser:</p>
+                <p style="font-size: 12px; color: #94a3b8; word-break: break-all;">${reviewUrl}</p>
+                <p style="margin-top: 20px; font-size: 13px; color: #64748b;">Eagle Bus Transportation — theeaglebus.com</p>
+              </div>
+            </div>`
+
+          await messagingService.sendEmail(
+            trip.contactEmail,
+            `How Was Your Eagle Bus Trip? — ${trip.organizationName}`,
+            `Hello ${trip.contactName},\n\nThank you for choosing Eagle Bus! We'd love to hear about your experience.\n\nRate your trip here: ${reviewUrl}\n\nThank you!\nEagle Bus Transportation`,
+            reviewHtml
+          )
+        } catch (reviewErr) {
+          console.warn("[CHARTER_TRIPS_POST] Review request send failed (non-blocking):", reviewErr)
+        }
+      }
+
+      return NextResponse.json({ success: true, message: `Trip status updated to ${status}${status === "COMPLETED" ? ". Review request sent to contact." : ""}` })
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 })

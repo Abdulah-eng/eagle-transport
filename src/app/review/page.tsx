@@ -7,38 +7,54 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 
+const GOOGLE_REVIEW_LINK =
+  process.env.NEXT_PUBLIC_GOOGLE_REVIEWS_LINK || "https://www.google.com/maps/search/Eagle+Bus+Transportation"
+
 function ReviewContent() {
   const searchParams = useSearchParams()
   const tripId = searchParams.get("tripId")
-  
+  const token = searchParams.get("token")
+
   const [rating, setRating] = useState<number>(0)
   const [hoverRating, setHoverRating] = useState<number>(0)
   const [feedback, setFeedback] = useState("")
   const [submitted, setSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // In production, this would be your actual Google Business Profile review link
-  const GOOGLE_REVIEW_LINK = "https://g.page/r/YOUR_EAGLE_BUS_ID/review"
+  const [errorMessage, setErrorMessage] = useState("")
 
   const handleSubmit = async () => {
     if (rating === 0) return
 
     setIsSubmitting(true)
-    
-    // Simulate API call to save review
-    // await fetch('/api/reviews', { method: 'POST', body: JSON.stringify({ tripId, rating, feedback }) })
-    
-    setTimeout(() => {
-      setIsSubmitting(false)
-      setSubmitted(true)
-      
-      // If 4 or 5 stars, redirect to Google Reviews
-      if (rating >= 4) {
-        setTimeout(() => {
-          window.location.href = GOOGLE_REVIEW_LINK
-        }, 2000)
-      }
-    }, 1000)
+    setErrorMessage("")
+
+    const goToGoogle = rating >= 4
+
+    try {
+      await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tripId: tripId || undefined,
+          token: token || undefined,
+          rating,
+          feedback,
+          redirectedToGoogle: goToGoogle,
+        }),
+      })
+    } catch (err) {
+      // Non-blocking — we still show success even if save fails
+      console.warn("[Review] Failed to save review:", err)
+    }
+
+    setIsSubmitting(false)
+    setSubmitted(true)
+
+    if (goToGoogle) {
+      setTimeout(() => {
+        window.open(GOOGLE_REVIEW_LINK, "_blank", "noopener,noreferrer")
+      }, 2000)
+    }
   }
 
   if (submitted) {
@@ -46,7 +62,7 @@ function ReviewContent() {
       <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
         <Card className="w-full max-w-lg shadow-xl text-center">
           <CardHeader>
-            <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-emerald-500/10 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
@@ -60,15 +76,24 @@ function ReviewContent() {
             {rating >= 4 ? (
               <div className="space-y-4">
                 <p className="text-muted-foreground">
-                  We are thrilled that you had a great experience! We are redirecting you to Google to share your experience with others.
+                  We&apos;re thrilled you had a great experience! We&apos;re opening Google Reviews so you can share it with others.
                 </p>
                 <div className="animate-pulse flex space-x-2 justify-center py-4">
                   <div className="w-3 h-3 bg-primary rounded-full"></div>
-                  <div className="w-3 h-3 bg-primary rounded-full animation-delay-200"></div>
-                  <div className="w-3 h-3 bg-primary rounded-full animation-delay-400"></div>
+                  <div className="w-3 h-3 bg-primary rounded-full" style={{ animationDelay: "200ms" }}></div>
+                  <div className="w-3 h-3 bg-primary rounded-full" style={{ animationDelay: "400ms" }}></div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  If you are not redirected automatically, <a href={GOOGLE_REVIEW_LINK} className="text-primary hover:underline">click here</a>.
+                  If it didn&apos;t open,{" "}
+                  <a
+                    href={GOOGLE_REVIEW_LINK}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline font-semibold"
+                  >
+                    click here to leave a Google review
+                  </a>
+                  .
                 </p>
               </div>
             ) : (
@@ -85,7 +110,7 @@ function ReviewContent() {
   return (
     <div className="min-h-screen bg-muted/30 py-12 px-4 flex flex-col items-center justify-center">
       <div className="text-center mb-8 animate-slide-up">
-        <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl font-heading text-gradient">
+        <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl font-heading">
           Eagle Bus Service
         </h1>
         <p className="mt-4 text-xl text-muted-foreground">
@@ -110,10 +135,11 @@ function ReviewContent() {
                 onMouseEnter={() => setHoverRating(star)}
                 onMouseLeave={() => setHoverRating(0)}
                 className="transition-transform hover:scale-110 focus:outline-none"
+                aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className={`h-12 w-12 ${(hoverRating || rating) >= star ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
+                  className={`h-12 w-12 transition-colors ${(hoverRating || rating) >= star ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -126,19 +152,23 @@ function ReviewContent() {
 
           <div className={`space-y-2 transition-opacity duration-300 ${rating > 0 ? "opacity-100" : "opacity-0 h-0 overflow-hidden"}`}>
             <Label htmlFor="feedback">Any additional comments? (Optional)</Label>
-            <Textarea 
-              id="feedback" 
+            <Textarea
+              id="feedback"
               placeholder="Tell us more about your experience..."
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
               className="resize-none h-32"
             />
           </div>
+
+          {errorMessage && (
+            <p className="text-sm text-red-500 text-center">{errorMessage}</p>
+          )}
         </CardContent>
         <CardFooter className="flex-col items-stretch pt-2">
-          <Button 
-            size="lg" 
-            onClick={handleSubmit} 
+          <Button
+            size="lg"
+            onClick={handleSubmit}
             disabled={rating === 0 || isSubmitting}
             className="w-full text-lg h-14"
           >
