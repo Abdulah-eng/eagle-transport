@@ -400,34 +400,82 @@ export async function POST(req: Request) {
       try {
         const billingEmail = trip.billingEmail || trip.contactEmail
         const billingName = trip.billingName || trip.organizationName
-        const qbInvoiceUrl = qbInvoiceId
+        const qbInvoiceUrl = (qbInvoiceId && qbInvoiceId !== "149" && /^\d+$/.test(qbInvoiceId.trim()))
           ? `https://sandbox.qbo.intuit.com/app/invoice?txnId=${qbInvoiceId}`
           : null
 
+        const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://eaglebusconnect.com").replace(/\/$/, "")
+        const portalPayUrl = trip.schoolId
+          ? `${appUrl}/school-portal/${trip.schoolId}/invoices?invoiceId=${invNumber}`
+          : `${appUrl}/school-portal`
+
         const htmlInvoiceEmail = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #7c3aed; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-              <h2 style="margin: 0;">Eagle Bus — Invoice Ready</h2>
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+            <div style="background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%); color: white; padding: 28px 24px; text-align: left;">
+              <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 700; margin-bottom: 4px;">Eagle Bus Transportation</div>
+              <h2 style="margin: 0; font-size: 24px; font-weight: 800;">Charter Invoice Ready</h2>
             </div>
-            <div style="padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
-              <p>Dear <strong>${billingName}</strong>,</p>
-              <p>An invoice has been generated for your upcoming charter trip.</p>
-              <div style="background: #ede9fe; padding: 16px; border-radius: 8px; margin: 16px 0;">
-                <div style="font-size: 13px; color: #6d28d9;">Invoice #</div>
-                <div style="font-size: 20px; font-weight: bold; color: #4c1d95;">${invNumber}</div>
-                <div style="font-size: 24px; font-weight: bold; color: #7c3aed; margin-top: 8px;">$${amount.toFixed(2)}</div>
-                <div style="font-size: 12px; color: #6d28d9; margin-top: 4px;">Due within 7 days</div>
+            
+            <div style="padding: 28px 24px; background: #ffffff; color: #1e293b;">
+              <p style="font-size: 16px; margin-top: 0; color: #0f172a;">Dear <strong>${billingName}</strong>,</p>
+              <p style="font-size: 14px; color: #475569; line-height: 1.6;">An invoice has been generated for your upcoming charter transportation trip for <strong>${trip.organizationName}</strong>.</p>
+              
+              <div style="background: #f4f0ff; border: 1px solid #ddd6fe; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="font-size: 12px; color: #6d28d9; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Invoice #</td>
+                    <td style="font-size: 12px; color: #6d28d9; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; text-align: right;">Organization</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 18px; font-weight: 800; color: #4c1d95; padding-top: 2px;">${invNumber}</td>
+                    <td style="font-size: 15px; font-weight: 700; color: #1e293b; text-align: right; padding-top: 2px;">${trip.organizationName}</td>
+                  </tr>
+                </table>
+                
+                <hr style="border: 0; border-top: 1px dashed #c4b5fd; margin: 16px 0;" />
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="font-size: 13px; color: #5b21b6; font-weight: 600;">Total Amount Due</td>
+                    <td style="font-size: 26px; font-weight: 900; color: #6d28d9; text-align: right;">$${amount.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 12px; color: #64748b; padding-top: 4px;">Terms</td>
+                    <td style="font-size: 12px; font-weight: 700; color: #b45309; text-align: right; padding-top: 4px;">Due within 7 days</td>
+                  </tr>
+                </table>
               </div>
-              ${qbInvoiceUrl ? `<p><a href="${qbInvoiceUrl}" style="background: #7c3aed; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: bold;">View Invoice in QuickBooks</a></p>` : ""}
-              <p>If you have any questions about this invoice, please contact us at <a href="mailto:billing@eaglebus.com">billing@eaglebus.com</a>.</p>
-              <p style="margin-top: 16px; font-size: 13px; color: #64748b;">Eagle Bus Transportation — theeaglebus.com</p>
+
+              <!-- Action Buttons -->
+              <div style="margin: 28px 0; text-align: center;">
+                <a href="${portalPayUrl}" style="display: inline-block; background: #7c3aed; color: #ffffff; font-weight: 700; padding: 14px 28px; border-radius: 10px; text-decoration: none; font-size: 15px; box-shadow: 0 4px 10px rgba(124,58,237,0.3); margin: 4px;">
+                  💳 View & Pay Invoice Online
+                </a>
+                ${qbInvoiceUrl ? `
+                <a href="${qbInvoiceUrl}" target="_blank" style="display: inline-block; background: #15803d; color: #ffffff; font-weight: 700; padding: 14px 24px; border-radius: 10px; text-decoration: none; font-size: 15px; box-shadow: 0 4px 10px rgba(21,128,61,0.25); margin: 4px;">
+                  📗 View in QuickBooks
+                </a>
+                ` : ""}
+              </div>
+
+              <div style="background: #f8fafc; border-left: 4px solid #7c3aed; padding: 14px 16px; border-radius: 6px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 13px; color: #334155; line-height: 1.5;">
+                  <strong>Payment Options:</strong> You can review, download statements, and pay online using your credit card, ACH, or check via your <strong>School & Client Portal</strong>.
+                </p>
+              </div>
+
+              <p style="font-size: 13px; color: #64748b; line-height: 1.5;">If you have any questions regarding this invoice, please reach out to our billing team at <a href="mailto:billing@eaglebus.com" style="color: #7c3aed; font-weight: 600; text-decoration: none;">billing@eaglebus.com</a>.</p>
+              
+              <div style="margin-top: 24px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 18px; text-align: center;">
+                Eagle Bus Transportation • <a href="${appUrl}" style="color: #64748b; text-decoration: none;">theeaglebus.com</a>
+              </div>
             </div>
           </div>`
 
         await messagingService.sendEmail(
           billingEmail,
           `Invoice Ready — ${trip.organizationName} Charter Trip (${invNumber})`,
-          `Dear ${billingName},\n\nYour invoice ${invNumber} for $${amount.toFixed(2)} is ready for the ${trip.organizationName} charter trip.${qbInvoiceUrl ? `\n\nView in QuickBooks: ${qbInvoiceUrl}` : ""}\n\nThank you for choosing Eagle Bus!`,
+          `Dear ${billingName},\n\nYour invoice ${invNumber} for $${amount.toFixed(2)} is ready for the ${trip.organizationName} charter trip.\n\nView & Pay Online: ${portalPayUrl}${qbInvoiceUrl ? `\nView in QuickBooks: ${qbInvoiceUrl}` : ""}\n\nThank you for choosing Eagle Bus!`,
           htmlInvoiceEmail
         )
       } catch (invoiceEmailErr) {
