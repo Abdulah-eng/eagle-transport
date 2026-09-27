@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -33,10 +33,13 @@ const fieldTripSchema = baseSchema.extend({
   pickupAddress: z.string().min(5, "Pickup address is required"),
   destinationAddress: z.string().min(5, "Destination address is required"),
   stagingTime: z.string().min(1, "Staging time is required"),
+  returnTime: z.string().optional(),
   numberOfStudents: z.number().min(1, "At least 1 student is required"),
+  numberOfChaperones: z.number().optional(),
   numberOfBuses: z.number().min(1, "At least 1 bus is required"),
   billingName: z.string().min(2, "Billing name is required"),
   billingEmail: z.string().email("Invalid billing email"),
+  billingPhone: z.string().optional(),
   specialInstructions: z.string().optional(),
   agreeRules: z.boolean().refine(val => val === true, "You must agree to the School Group Rules & Guidelines"),
 })
@@ -69,6 +72,9 @@ export default function IntakePage() {
   const [errorMessage, setErrorMessage] = useState("")
   const [showRulesAccordion, setShowRulesAccordion] = useState(false)
 
+  const pickupInputRef = useRef<HTMLInputElement | null>(null)
+  const destinationInputRef = useRef<HTMLInputElement | null>(null)
+
   const getSchema = () => {
     switch (serviceType) {
       case "field_trip": return fieldTripSchema;
@@ -77,10 +83,55 @@ export default function IntakePage() {
     }
   }
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<any>({
+  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm<any>({
     resolver: zodResolver(getSchema()),
     defaultValues: { serviceType: "field_trip" }
   })
+
+  // Google Places Autocomplete Integration
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function initAutocomplete() {
+      if ((window as any).google && (window as any).google.maps && (window as any).google.maps.places) {
+        if (pickupInputRef.current) {
+          const pAuto = new (window as any).google.maps.places.Autocomplete(pickupInputRef.current, {
+            types: ["address"],
+            componentRestrictions: { country: "us" }
+          });
+          pAuto.addListener("place_changed", () => {
+            const place = pAuto.getPlace();
+            if (place?.formatted_address) {
+              setValue("pickupAddress", place.formatted_address);
+            }
+          });
+        }
+        if (destinationInputRef.current) {
+          const dAuto = new (window as any).google.maps.places.Autocomplete(destinationInputRef.current, {
+            types: ["establishment", "geocode"],
+            componentRestrictions: { country: "us" }
+          });
+          dAuto.addListener("place_changed", () => {
+            const place = dAuto.getPlace();
+            if (place?.formatted_address || place?.name) {
+              setValue("destinationAddress", place.formatted_address || place.name || "");
+            }
+          });
+        }
+      }
+    }
+
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+    if (!(window as any).google && apiKey) {
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.onload = initAutocomplete;
+      document.head.appendChild(script);
+    } else {
+      initAutocomplete();
+    }
+  }, [setValue, serviceType]);
 
   const onSubmit = async (data: any) => {
     setIsSubmitting(true)
@@ -314,56 +365,90 @@ export default function IntakePage() {
                     {errors.organizationName && <p className="text-xs text-destructive">{errors.organizationName.message as string}</p>}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="tripDate" className="text-xs font-semibold">Pickup Date of Trip *</Label>
                       <Input id="tripDate" type="date" {...register("tripDate")} />
                       {errors.tripDate && <p className="text-xs text-destructive">{errors.tripDate.message as string}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="stagingTime" className="text-xs font-semibold">Staging Time for Pickup *</Label>
+                      <Label htmlFor="stagingTime" className="text-xs font-semibold">Staging / Pickup Time *</Label>
                       <Input id="stagingTime" type="time" {...register("stagingTime")} />
                       {errors.stagingTime && <p className="text-xs text-destructive">{errors.stagingTime.message as string}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="returnTime" className="text-xs font-semibold">Estimated Return Time</Label>
+                      <Input id="returnTime" type="time" {...register("returnTime")} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="pickupAddress" className="text-xs font-semibold">Pickup Address *</Label>
-                      <Input id="pickupAddress" {...register("pickupAddress")} placeholder="123 School Rd, Charlotte, NC" />
+                      <Label htmlFor="pickupAddress" className="text-xs font-semibold flex items-center justify-between">
+                        <span>Pickup Address *</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">Google Maps Auto-complete</span>
+                      </Label>
+                      <Input 
+                        id="pickupAddress" 
+                        {...register("pickupAddress")} 
+                        ref={(e) => {
+                          register("pickupAddress").ref(e);
+                          pickupInputRef.current = e;
+                        }}
+                        placeholder="Start typing address (e.g. 123 School Rd, Charlotte, NC)" 
+                      />
                       {errors.pickupAddress && <p className="text-xs text-destructive">{errors.pickupAddress.message as string}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="destinationAddress" className="text-xs font-semibold">Destination Address *</Label>
-                      <Input id="destinationAddress" {...register("destinationAddress")} placeholder="Discovery Place Museum, Charlotte" />
+                      <Label htmlFor="destinationAddress" className="text-xs font-semibold flex items-center justify-between">
+                        <span>Destination Address *</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">Google Maps Auto-complete</span>
+                      </Label>
+                      <Input 
+                        id="destinationAddress" 
+                        {...register("destinationAddress")} 
+                        ref={(e) => {
+                          register("destinationAddress").ref(e);
+                          destinationInputRef.current = e;
+                        }}
+                        placeholder="Start typing destination or venue name" 
+                      />
                       {errors.destinationAddress && <p className="text-xs text-destructive">{errors.destinationAddress.message as string}</p>}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="space-y-1.5 col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
                       <Label htmlFor="numberOfStudents" className="text-xs font-semibold"># of Students / Passengers *</Label>
                       <Input id="numberOfStudents" type="number" {...register("numberOfStudents", { valueAsNumber: true })} placeholder="50" />
                       {errors.numberOfStudents && <p className="text-xs text-destructive">{errors.numberOfStudents.message as string}</p>}
                     </div>
-                    <div className="space-y-1.5 col-span-2">
-                      <Label htmlFor="numberOfBuses" className="text-xs font-semibold">Number of Buses (Max 50-60 riders/bus) *</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="numberOfChaperones" className="text-xs font-semibold"># of Chaperones / Teachers</Label>
+                      <Input id="numberOfChaperones" type="number" {...register("numberOfChaperones", { valueAsNumber: true })} placeholder="5" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="numberOfBuses" className="text-xs font-semibold">Buses Requested (Max 50-60/bus) *</Label>
                       <Input id="numberOfBuses" type="number" {...register("numberOfBuses", { valueAsNumber: true })} defaultValue={1} />
                       {errors.numberOfBuses && <p className="text-xs text-destructive">{errors.numberOfBuses.message as string}</p>}
                     </div>
                   </div>
 
                   <h3 className="text-base font-bold text-primary border-b border-primary/20 pb-2 pt-4">Billing Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="billingName" className="text-xs font-semibold">Name (for billing purposes) *</Label>
-                      <Input id="billingName" {...register("billingName")} />
+                      <Label htmlFor="billingName" className="text-xs font-semibold">Billing Contact Name *</Label>
+                      <Input id="billingName" {...register("billingName")} placeholder="Accounts Payable / Name" />
                       {errors.billingName && <p className="text-xs text-destructive">{errors.billingName.message as string}</p>}
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="billingEmail" className="text-xs font-semibold">Email (for billing purposes) *</Label>
-                      <Input id="billingEmail" type="email" {...register("billingEmail")} />
+                      <Label htmlFor="billingEmail" className="text-xs font-semibold">Billing Email *</Label>
+                      <Input id="billingEmail" type="email" {...register("billingEmail")} placeholder="billing@school.org" />
                       {errors.billingEmail && <p className="text-xs text-destructive">{errors.billingEmail.message as string}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="billingPhone" className="text-xs font-semibold">Billing Phone</Label>
+                      <Input id="billingPhone" {...register("billingPhone")} placeholder="(704) 555-0199" />
                     </div>
                   </div>
 

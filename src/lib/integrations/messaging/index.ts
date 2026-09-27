@@ -179,32 +179,85 @@ export const messaging = {
 
   async sendBookingConfirmation(
     contact: { email: string; name: string },
-    trip: { organizationName: string; tripDate: Date; id: string }
+    trip: { 
+      id: string;
+      organizationName: string; 
+      tripDate: Date; 
+      stagingTime?: Date | string | null;
+      returnTime?: Date | string | null;
+      pickupAddress?: string | null;
+      destinationAddress?: string | null;
+      numberOfStudents?: number | null;
+      numberOfBuses?: number | null;
+      billingName?: string | null;
+      billingEmail?: string | null;
+      billingPhone?: string | null;
+      specialInstructions?: string | null;
+    }
   ): Promise<void> {
     const dateStr = new Date(trip.tripDate).toLocaleDateString("en-US", {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
     });
+    const stagingStr = trip.stagingTime 
+      ? (trip.stagingTime instanceof Date ? trip.stagingTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : String(trip.stagingTime))
+      : "TBD";
+    const returnStr = trip.returnTime 
+      ? (trip.returnTime instanceof Date ? trip.returnTime.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : String(trip.returnTime))
+      : "TBD";
+
+    const textBody = `Hello ${contact.name},\n\nYour field trip request for ${trip.organizationName} on ${dateStr} has been received.\n\n` +
+      `Trip Details:\n` +
+      `• Organization: ${trip.organizationName}\n` +
+      `• Date: ${dateStr}\n` +
+      `• Staging Time: ${stagingStr}\n` +
+      `• Pickup Location: ${trip.pickupAddress || 'TBD'}\n` +
+      `• Destination: ${trip.destinationAddress || 'TBD'}\n` +
+      `• Passengers: ${trip.numberOfStudents || 'N/A'}\n` +
+      `• Buses Requested: ${trip.numberOfBuses || 1}\n` +
+      `• Billing Contact: ${trip.billingName || contact.name} (${trip.billingEmail || contact.email})\n` +
+      (trip.specialInstructions ? `• Notes: ${trip.specialInstructions}\n` : '') +
+      `\nReference ID: ${trip.id}\n\nOur team will review your request and send you a formal quote shortly.\n\nThank you for choosing Eagle Bus!\n\nEagle Bus Transportation Services`;
+
+    const htmlBody = `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+        <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 28px 24px; text-align: left;">
+          <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 700; margin-bottom: 4px;">Eagle Bus Transportation</div>
+          <h1 style="margin: 0; font-size: 24px; font-weight: 800;">Trip Request Confirmation</h1>
+        </div>
+        
+        <div style="padding: 24px; color: #1e293b;">
+          <p style="font-size: 16px; margin-top: 0;">Hello <strong>${contact.name}</strong>,</p>
+          <p style="font-size: 14px; color: #475569; line-height: 1.5;">Thank you for submitting your transportation request. Your trip details have been recorded and are currently under review by our dispatch team.</p>
+          
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin: 20px 0;">
+            <div style="font-size: 12px; font-weight: 700; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; border-b: 1px solid #e2e8f0; padding-bottom: 6px;">Submitted Trip Summary</div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+              <tr><td style="padding: 6px 0; color: #64748b; width: 40%;">Organization:</td><td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${trip.organizationName}</td></tr>
+              <tr><td style="padding: 6px 0; color: #64748b;">Reference ID:</td><td style="padding: 6px 0; font-family: monospace; font-weight: 700; color: #2563eb;">${trip.id}</td></tr>
+              <tr><td style="padding: 6px 0; color: #64748b;">Trip Date:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${dateStr}</td></tr>
+              <tr><td style="padding: 6px 0; color: #64748b;">Staging / Pickup Time:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${stagingStr}</td></tr>
+              ${trip.returnTime ? `<tr><td style="padding: 6px 0; color: #64748b;">Return / Dropoff Time:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${returnStr}</td></tr>` : ''}
+              <tr><td style="padding: 6px 0; color: #64748b;">Pickup Address:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${trip.pickupAddress || 'TBD'}</td></tr>
+              <tr><td style="padding: 6px 0; color: #64748b;">Destination Address:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${trip.destinationAddress || 'TBD'}</td></tr>
+              <tr><td style="padding: 6px 0; color: #64748b;">Passengers / Buses:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${trip.numberOfStudents || 'N/A'} passengers (${trip.numberOfBuses || 1} bus/es)</td></tr>
+              <tr><td style="padding: 6px 0; color: #64748b;">Billing Contact:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${trip.billingName || contact.name} (${trip.billingEmail || contact.email})</td></tr>
+              ${trip.specialInstructions ? `<tr><td style="padding: 6px 0; color: #64748b;">Special Instructions:</td><td style="padding: 6px 0; color: #475569;">${trip.specialInstructions}</td></tr>` : ''}
+            </table>
+          </div>
+
+          <p style="font-size: 14px; color: #475569; line-height: 1.5;">Our team will evaluate bus & driver availability and send you an official quote within 1-2 business days.</p>
+
+          <p style="margin-top: 24px; color: #64748b; font-size: 12px; border-t: 1px solid #f1f5f9; padding-top: 16px; text-align: center;">
+            Eagle Bus Transportation Services • <a href="https://eaglebusconnect.com" style="color: #2563eb; text-decoration: none;">theeaglebus.com</a> • (704) 606-5661
+          </p>
+        </div>
+      </div>`;
+
     await this.sendEmail(
       contact.email,
       `Trip Request Confirmed - ${trip.organizationName}`,
-      `Hello ${contact.name},\n\nYour field trip request for ${trip.organizationName} on ${dateStr} has been received.\n\nOur team will review your request and send you a quote shortly.\n\nReference ID: ${trip.id}\n\nThank you for choosing Eagle Bus!\n\nEagle Bus Transportation`,
-      `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: #1e40af; color: white; padding: 24px; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; font-size: 24px;">Eagle Bus Transportation</h1>
-          <p style="margin: 8px 0 0; opacity: 0.9;">Trip Request Confirmation</p>
-        </div>
-        <div style="padding: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;">
-          <p>Hello <strong>${contact.name}</strong>,</p>
-          <p>Your field trip request has been received and is under review.</p>
-          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-            <tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Organization</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${trip.organizationName}</td></tr>
-            <tr><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; color: #64748b;">Trip Date</td><td style="padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 600;">${dateStr}</td></tr>
-            <tr><td style="padding: 8px; color: #64748b;">Reference ID</td><td style="padding: 8px; font-family: monospace;">${trip.id}</td></tr>
-          </table>
-          <p>Our team will review your request and send you a quote shortly. You can expect to hear from us within 1-2 business days.</p>
-          <p style="margin-top: 24px; color: #64748b; font-size: 14px;">Eagle Bus Transportation Service | theeaglebus.com</p>
-        </div>
-      </div>`
+      textBody,
+      htmlBody
     );
   },
 };

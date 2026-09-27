@@ -194,7 +194,20 @@ export async function POST(req: NextRequest) {
       try {
         await messaging.sendBookingConfirmation(
           { email: contactEmail, name: contactName },
-          { id: activeTripId, organizationName: orgName, tripDate: tripDateObj }
+          { 
+            id: activeTripId, 
+            organizationName: orgName, 
+            tripDate: tripDateObj,
+            stagingTime: stagingTimeObj,
+            pickupAddress: pickup,
+            destinationAddress: destination,
+            numberOfStudents: students,
+            numberOfBuses: buses,
+            billingName: billName,
+            billingEmail: billEmail,
+            billingPhone: data.billingPhone || contactPhone || null,
+            specialInstructions: data.specialInstructions || null
+          }
         );
       } catch (mailErr) {
         console.warn("[INTAKE_API] Email confirmation send warning:", mailErr);

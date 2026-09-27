@@ -167,19 +167,70 @@ export async function POST(req: Request) {
       }
 
       try {
+        const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://eaglebusconnect.com").replace(/\/$/, "");
+        const approveUrl = `${appUrl}/api/charter-trips/approve?tripId=${trip.id}`;
+        const dateStr = new Date(trip.tripDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+        const stagingStr = trip.stagingTime ? new Date(trip.stagingTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "TBD";
+
+        const htmlQuoteEmail = `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+            <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 28px 24px; text-align: left;">
+              <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 700; margin-bottom: 4px;">Eagle Bus Transportation</div>
+              <h2 style="margin: 0; font-size: 24px; font-weight: 800;">Charter Quote Ready</h2>
+            </div>
+            
+            <div style="padding: 28px 24px; background: #ffffff; color: #1e293b;">
+              <p style="font-size: 16px; margin-top: 0; color: #0f172a;">Dear <strong>${trip.contactName}</strong>,</p>
+              <p style="font-size: 14px; color: #475569; line-height: 1.6;">We are pleased to provide your customized transportation quote for <strong>${trip.organizationName}</strong>.</p>
+              
+              <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <div style="font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; border-b: 1px solid #dbeafe; padding-bottom: 6px;">Re-Confirmed Trip Details</div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                  <tr><td style="padding: 6px 0; color: #64748b; width: 40%;">Organization:</td><td style="padding: 6px 0; font-weight: 700; color: #0f172a;">${trip.organizationName}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748b;">Trip Date:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${dateStr}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748b;">Staging / Pickup Time:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${stagingStr}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748b;">Pickup Address:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${trip.pickupAddress}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748b;">Destination Address:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${trip.destinationName || trip.destinationAddress}</td></tr>
+                  <tr><td style="padding: 6px 0; color: #64748b;">Passengers / Buses:</td><td style="padding: 6px 0; font-weight: 600; color: #0f172a;">${trip.numberOfStudents || 'N/A'} passengers (${trip.numberOfBuses || 1} bus/es)</td></tr>
+                </table>
+                
+                <hr style="border: 0; border-top: 1px dashed #93c5fd; margin: 16px 0;" />
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="font-size: 14px; color: #1e40af; font-weight: 700;">Total Quoted Rate:</td>
+                    <td style="font-size: 28px; font-weight: 900; color: #1e40af; text-align: right;">$${numAmount.toFixed(2)}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Action Button to Approve -->
+              <div style="margin: 28px 0; text-align: center;">
+                <a href="${approveUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; font-weight: 700; padding: 16px 32px; border-radius: 10px; text-decoration: none; font-size: 16px; box-shadow: 0 4px 12px rgba(37,99,235,0.3);">
+                  ✅ Approve Quote & Confirm Booking
+                </a>
+              </div>
+
+              <div style="background: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 16px; border-radius: 6px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 13px; color: #334155; line-height: 1.5;">
+                  <strong>Next Steps:</strong> Click the button above to approve this quote. Once approved, our team will reserve your bus, assign your driver, and send your invoice payment link.
+                </p>
+              </div>
+
+              <p style="font-size: 13px; color: #64748b; line-height: 1.5;">If you have any questions or need itinerary adjustments, please reach out to our dispatch team at <a href="mailto:billing@eaglebus.com" style="color: #2563eb; font-weight: 600; text-decoration: none;">billing@eaglebus.com</a> or call (704) 606-5661.</p>
+              
+              <div style="margin-top: 24px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 18px; text-align: center;">
+                Eagle Bus Transportation • <a href="${appUrl}" style="color: #64748b; text-decoration: none;">theeaglebus.com</a>
+              </div>
+            </div>
+          </div>`;
+
         await messagingService.sendEmail(
           trip.contactEmail,
           `Eagle Bus Charter Quote Ready - ${trip.organizationName}`,
-          `Hello ${trip.contactName},\n\nYour charter quote for ${trip.organizationName} on ${new Date(trip.tripDate).toLocaleDateString()} is ready: $${numAmount.toFixed(2)}.\n\nThank you for choosing Eagle Bus!`,
-          `<div style="font-family: sans-serif; padding: 20px;">
-            <h2>Eagle Bus Charter Quote</h2>
-            <p>Dear ${trip.contactName},</p>
-            <p>We are pleased to provide your quote for the upcoming trip on <strong>${new Date(trip.tripDate).toLocaleDateString()}</strong>.</p>
-            <div style="background: #f1f5f9; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; color: #1e40af;">
-              Total Quoted Amount: $${numAmount.toFixed(2)}
-            </div>
-          </div>`
-        )
+          `Hello ${trip.contactName},\n\nYour charter quote for ${trip.organizationName} on ${dateStr} is ready: $${numAmount.toFixed(2)}.\n\nApprove Quote: ${approveUrl}\n\nThank you for choosing Eagle Bus!`,
+          htmlQuoteEmail
+        );
       } catch {}
 
       return NextResponse.json({ success: true, message: "Quote generated and sent to customer", quote: quote || { amount: numAmount } })
@@ -291,9 +342,10 @@ export async function POST(req: Request) {
 
             // SMS notification
             if (driver.phone) {
+              const stagingStr = trip.stagingTime ? new Date(trip.stagingTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "TBD";
               await messagingService.sendSMS(
                 driver.phone,
-                `Eagle Bus: You are assigned to ${trip.organizationName} on ${dateStr}. Pickup: ${trip.pickupAddress}. Check your email for details.`
+                `Eagle Bus Assignment: You are assigned to ${trip.organizationName} on ${dateStr}. Staging: ${stagingStr}. Pickup: ${trip.pickupAddress}. Destination: ${trip.destinationName || trip.destinationAddress}.${notes ? ` Notes: ${notes}` : ""}`
               )
             }
           }
