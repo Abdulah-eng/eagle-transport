@@ -239,58 +239,79 @@ export default function CharterTripsClient({
 
                       <td className="p-4">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                          trip.status === "NEW" ? "bg-blue-500/10 text-blue-600" :
-                          trip.status === "QUOTED" ? "bg-amber-500/10 text-amber-600" :
-                          trip.status === "SCHEDULED" ? "bg-emerald-500/10 text-emerald-600" :
-                          trip.status === "INVOICED" ? "bg-purple-500/10 text-purple-600" :
+                          trip.status === "NEW" ? "bg-blue-500/10 text-blue-600 border border-blue-200" :
+                          trip.status === "QUOTED" ? "bg-amber-500/10 text-amber-600 border border-amber-200" :
+                          trip.status === "APPROVED" ? "bg-emerald-500/10 text-emerald-700 border border-emerald-200" :
+                          trip.status === "SCHEDULED" ? "bg-indigo-500/10 text-indigo-700 border border-indigo-200" :
+                          trip.status === "INVOICED" ? "bg-purple-500/10 text-purple-700 border border-purple-200" :
+                          trip.status === "PAID" ? "bg-emerald-600 text-white" :
                           "bg-secondary text-secondary-foreground"
                         }`}>
-                          {trip.status}
+                          {trip.status === "APPROVED" ? "Quote Approved" : trip.status}
                         </span>
                       </td>
 
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                          {/* Quote Action */}
-                          <button
-                            onClick={() => {
-                              setSelectedTrip(trip)
-                              setQuoteAmount(!isNaN(numQuote) && numQuote > 0 ? String(numQuote) : "")
-                              setModalType("quote")
-                            }}
-                            className="px-2.5 py-1.5 border border-input rounded text-xs font-medium hover:bg-muted transition-colors flex items-center gap-1"
-                            title="Generate/Edit Quote"
-                          >
-                            <DollarSign className="w-3.5 h-3.5 text-emerald-600" /> Quote
-                          </button>
+                          {/* 1. Quote Action (Show for NEW or QUOTED) */}
+                          {(trip.status === "NEW" || trip.status === "QUOTED") && (
+                            <button
+                              onClick={() => {
+                                setSelectedTrip(trip)
+                                setQuoteAmount(!isNaN(numQuote) && numQuote > 0 ? String(numQuote) : "")
+                                setModalType("quote")
+                              }}
+                              className="px-2.5 py-1.5 border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                              title="Send / Edit Quote to Customer"
+                            >
+                              <DollarSign className="w-3.5 h-3.5 text-emerald-600" /> {trip.status === "QUOTED" ? "Edit Quote" : "Send Quote"}
+                            </button>
+                          )}
 
-                          {/* Assign Driver & Bus Action */}
-                          <button
-                            onClick={() => {
-                              setSelectedTrip(trip)
-                              setSelectedDriverId(assignment?.driverId || "")
-                              setSelectedBusId(assignment?.busId || "")
-                              setModalType("assignment")
-                            }}
-                            className="px-2.5 py-1.5 bg-primary text-primary-foreground rounded text-xs font-medium hover:bg-primary/90 transition-colors flex items-center gap-1"
-                            title="Assign Driver & Bus"
-                          >
-                            <UserCheck className="w-3.5 h-3.5" /> Assign
-                          </button>
+                          {/* 2. Assign Driver & Bus Action (Show when APPROVED, QUOTED, SCHEDULED, INVOICED) */}
+                          {trip.status !== "COMPLETED" && trip.status !== "CANCELLED" && (
+                            <button
+                              onClick={() => {
+                                setSelectedTrip(trip)
+                                setSelectedDriverId(assignment?.driverId || "")
+                                setSelectedBusId(assignment?.busId || "")
+                                setModalType("assignment")
+                              }}
+                              className={`px-2.5 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1 shadow-sm ${
+                                trip.status === "APPROVED" || !assignment?.driver
+                                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                  : "border border-input text-foreground hover:bg-muted"
+                              }`}
+                              title="Assign Driver & Bus"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" /> {assignment?.driver ? "Edit Crew" : "Assign Driver"}
+                            </button>
+                          )}
 
-                          {/* QuickBooks Invoice Action */}
-                          <button
-                            disabled={loadingAction === `create_qb_invoice-${trip.id}`}
-                            onClick={() => handleExecuteAction("create_qb_invoice", { tripId: trip.id })}
-                            className="px-2.5 py-1.5 border border-purple-200 text-purple-700 hover:bg-purple-50 rounded text-xs font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
-                            title="Generate QuickBooks Invoice"
-                          >
-                            {loadingAction === `create_qb_invoice-${trip.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
-                            QB Invoice
-                          </button>
+                          {/* 3. QuickBooks / Invoice Status Badge */}
+                          {(trip.status === "INVOICED" || trip.status === "PAID" || trip.quickbooksInvoiceId) ? (
+                            <span 
+                              className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded text-xs font-bold flex items-center gap-1 cursor-default"
+                              title="Invoice has been generated and sent to customer"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-purple-600" /> Invoiced
+                            </span>
+                          ) : (
+                            trip.status === "APPROVED" && (
+                              <button
+                                disabled={loadingAction === `create_qb_invoice-${trip.id}`}
+                                onClick={() => handleExecuteAction("create_qb_invoice", { tripId: trip.id })}
+                                className="px-2.5 py-1.5 border border-purple-300 text-purple-700 hover:bg-purple-50 rounded text-xs font-bold transition-colors flex items-center gap-1 disabled:opacity-50 shadow-sm"
+                                title="Generate & Email Invoice"
+                              >
+                                {loadingAction === `create_qb_invoice-${trip.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                                Send Invoice
+                              </button>
+                            )
+                          )}
 
-                          {/* Complete Trip — triggers review request email */}
-                          {(trip.status === "SCHEDULED" || trip.status === "INVOICED" || trip.status === "QUOTED") && (
+                          {/* 4. Complete Trip Action (Show for SCHEDULED, INVOICED, APPROVED) */}
+                          {(trip.status === "SCHEDULED" || trip.status === "INVOICED" || trip.status === "APPROVED" || trip.status === "PAID") && (
                             <button
                               disabled={loadingAction === `update_status-${trip.id}`}
                               onClick={() => {
@@ -298,7 +319,7 @@ export default function CharterTripsClient({
                                   handleExecuteAction("update_status", { tripId: trip.id, status: "COMPLETED" })
                                 }
                               }}
-                              className="px-2.5 py-1.5 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded text-xs font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
+                              className="px-2.5 py-1.5 border border-emerald-300 text-emerald-700 hover:bg-emerald-50 rounded text-xs font-bold transition-colors flex items-center gap-1 disabled:opacity-50 shadow-sm"
                               title="Mark as Completed & Send Review Request"
                             >
                               {loadingAction === `update_status-${trip.id}` ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Flag className="w-3.5 h-3.5" />}
