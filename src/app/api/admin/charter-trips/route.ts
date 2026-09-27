@@ -270,6 +270,27 @@ export async function POST(req: Request) {
 
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
+          const assignmentPayload = {
+            id: trip.assignments?.[0]?.id || `asgn_${Date.now()}`,
+            tripId,
+            driverId: driverId || null,
+            busId: busId || null,
+            notes: notes || null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+
+          await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/trip_assignments`, {
+            method: 'POST',
+            headers: {
+              'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify(assignmentPayload)
+          })
+
           await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/charter_trips?id=eq.${tripId}`, {
             method: 'PATCH',
             headers: {
@@ -279,15 +300,24 @@ export async function POST(req: Request) {
             },
             body: JSON.stringify({ status: 'SCHEDULED', updatedAt: new Date().toISOString() })
           })
+        } catch (supaErr) {
+          console.error("[CHARTER_TRIPS_POST] Supabase assignment save warning:", supaErr)
+        }
+      }
+
+      let assignedDriverObj: any = null
+      if (driverId) {
+        try {
+          assignedDriverObj = await db.driver.findUnique({ where: { id: driverId } })
         } catch {}
       }
 
       try {
         const calendarEventId = await googleCalendarService.createCharterEvent({
-          organizationName: trip.organizationName,
+          organizationName: `${trip.organizationName}${assignedDriverObj ? ` (Driver: ${assignedDriverObj.firstName} ${assignedDriverObj.lastName})` : ''}`,
           tripDate: trip.tripDate,
           pickupAddress: trip.pickupAddress,
-          destinationAddress: trip.destinationAddress,
+          destinationAddress: trip.destinationName || trip.destinationAddress,
           numberOfBuses: trip.numberOfBuses,
           contactName: trip.contactName,
           contactPhone: trip.contactPhone || "",
@@ -301,7 +331,9 @@ export async function POST(req: Request) {
             })
           } catch {}
         }
-      } catch {}
+      } catch (calErr) {
+        console.warn("[CHARTER_TRIPS_POST] Google Calendar sync warning:", calErr)
+      }
 
       // Notify assigned driver via email + SMS
       if (driverId) {

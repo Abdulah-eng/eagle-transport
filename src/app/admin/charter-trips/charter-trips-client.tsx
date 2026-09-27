@@ -187,6 +187,8 @@ export default function CharterTripsClient({
               ) : (
                 filteredTrips.map((trip) => {
                   const assignment = Array.isArray(trip.assignments) ? trip.assignments[0] : trip.assignments
+                  const assignedDriver = assignment?.driver || (assignment?.driverId ? drivers.find(d => d.id === assignment.driverId) : null)
+                  const assignedBus = assignment?.bus || (assignment?.busId ? buses.find(b => b.id === assignment.busId) : null)
                   const quoteObj = Array.isArray(trip.tripQuote) ? trip.tripQuote[0] : trip.tripQuote
                   const rawQuoteAmt = quoteObj?.amount ?? trip.quoteAmount ?? trip.estimatedCost
                   const numQuote = rawQuoteAmt !== undefined && rawQuoteAmt !== null ? Number(rawQuoteAmt) : NaN
@@ -224,13 +226,13 @@ export default function CharterTripsClient({
                       </td>
 
                       <td className="p-4 text-xs">
-                        {assignment?.driver ? (
+                        {assignedDriver ? (
                           <div>
                             <div className="font-bold text-foreground flex items-center gap-1">
                               <UserCheck className="w-3.5 h-3.5 text-primary" />
-                              {assignment.driver.firstName} {assignment.driver.lastName}
+                              {assignedDriver.firstName} {assignedDriver.lastName}
                             </div>
-                            <div className="text-muted-foreground">Bus #{assignment.bus?.busNumber || "102"}</div>
+                            <div className="text-muted-foreground font-medium">Bus #{assignedBus?.busNumber || "102"}</div>
                           </div>
                         ) : (
                           <span className="text-muted-foreground italic">Unassigned</span>
