@@ -239,6 +239,85 @@ export async function POST(req: Request) {
     // Action 2: Assign Driver and Bus
     if (action === "assign_driver_bus") {
       try {
+        // 1. Ensure charter trip exists in DB
+        try {
+          await db.charterTrip.upsert({
+            where: { id: tripId },
+            create: {
+              id: tripId,
+              organizationName: trip.organizationName || "Charter Trip",
+              contactName: trip.contactName || "Contact",
+              contactEmail: trip.contactEmail || "contact@example.com",
+              contactPhone: trip.contactPhone,
+              billingName: trip.billingName || trip.organizationName || "Billing",
+              billingEmail: trip.billingEmail || trip.contactEmail || "billing@example.com",
+              tripDate: trip.tripDate ? new Date(trip.tripDate) : new Date(),
+              pickupAddress: trip.pickupAddress || "Pickup",
+              destinationName: trip.destinationName || "Destination",
+              destinationAddress: trip.destinationAddress || "Destination",
+              tripType: trip.tripType || "FIELD_TRIP",
+              numberOfStudents: trip.numberOfStudents || 30,
+              numberOfBuses: trip.numberOfBuses || 1,
+              status: "SCHEDULED"
+            },
+            update: {
+              status: "SCHEDULED"
+            }
+          })
+        } catch (tripErr) {
+          console.warn("[CHARTER_TRIPS_POST] Charter trip upsert error:", tripErr)
+        }
+
+        if (driverId) {
+          try {
+            const userId = `usr_${driverId}`
+            await db.user.upsert({
+              where: { id: userId },
+              create: {
+                id: userId,
+                email: `${driverId}@eaglebus.com`,
+                name: driverId === "drv_1" ? "John Miller" : driverId === "drv_2" ? "Sarah Jenkins" : driverId === "drv_3" ? "Robert Davis" : "Emily Taylor",
+                role: "DRIVER"
+              },
+              update: {}
+            })
+
+            await db.driver.upsert({
+              where: { id: driverId },
+              create: {
+                id: driverId,
+                userId: userId,
+                firstName: driverId === "drv_1" ? "John" : driverId === "drv_2" ? "Sarah" : driverId === "drv_3" ? "Robert" : "Emily",
+                lastName: driverId === "drv_1" ? "Miller" : driverId === "drv_2" ? "Jenkins" : driverId === "drv_3" ? "Davis" : "Taylor",
+                licenseNo: "CDL-A-9921",
+                phone: "(704) 606-5661",
+                email: `${driverId}@eaglebus.com`,
+                isActive: true,
+              },
+              update: {}
+            })
+          } catch (drvErr) {
+            console.warn("[CHARTER_TRIPS_POST] Driver upsert error:", drvErr)
+          }
+        }
+
+        if (busId) {
+          try {
+            await db.bus.upsert({
+              where: { id: busId },
+              create: {
+                id: busId,
+                busNumber: busId.replace("bus_", ""),
+                capacity: 60,
+                isActive: true,
+              },
+              update: {}
+            })
+          } catch (busErr) {
+            console.warn("[CHARTER_TRIPS_POST] Bus upsert error:", busErr)
+          }
+        }
+
         const existingAssignment = trip.assignments?.[0]
         if (existingAssignment?.id) {
           await db.tripAssignment.update({
@@ -270,6 +349,51 @@ export async function POST(req: Request) {
 
       if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
+          if (driverId) {
+            const driverData = {
+              id: driverId,
+              firstName: driverId === "drv_1" ? "John" : driverId === "drv_2" ? "Sarah" : driverId === "drv_3" ? "Robert" : "Emily",
+              lastName: driverId === "drv_1" ? "Miller" : driverId === "drv_2" ? "Jenkins" : driverId === "drv_3" ? "Davis" : "Taylor",
+              licenseNo: "CDL-A-9921",
+              phone: "(704) 606-5661",
+              email: "driver@eaglebus.com",
+              isActive: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/drivers`, {
+              method: 'POST',
+              headers: {
+                'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates'
+              },
+              body: JSON.stringify(driverData)
+            })
+          }
+
+          if (busId) {
+            const busData = {
+              id: busId,
+              busNumber: busId.replace("bus_", ""),
+              capacity: 60,
+              isActive: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            }
+            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/buses`, {
+              method: 'POST',
+              headers: {
+                'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'resolution=merge-duplicates'
+              },
+              body: JSON.stringify(busData)
+            })
+          }
+
           const assignmentPayload = {
             id: trip.assignments?.[0]?.id || `asgn_${Date.now()}`,
             tripId,

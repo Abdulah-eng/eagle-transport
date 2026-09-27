@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { 
   Bus, Calendar, DollarSign, Users, CheckCircle2, 
@@ -37,12 +37,18 @@ export default function CharterTripsClient({
   const [selectedBusId, setSelectedBusId] = useState("")
   const [assignmentNotes, setAssignmentNotes] = useState("")
 
+  const [trips, setTrips] = useState<any[]>(initialTrips)
+
+  useEffect(() => {
+    setTrips(initialTrips)
+  }, [initialTrips])
+
   const showToast = (type: "success" | "error", text: string) => {
     setToast({ type, text })
     setTimeout(() => setToast(null), 4000)
   }
 
-  const filteredTrips = initialTrips.filter((trip) => {
+  const filteredTrips = trips.filter((trip) => {
     const searchLower = search.toLowerCase()
     const matchesSearch = 
       trip.organizationName?.toLowerCase().includes(searchLower) ||
@@ -54,10 +60,10 @@ export default function CharterTripsClient({
   })
 
   // Metric counts
-  const newCount = initialTrips.filter(t => t.status === "NEW" || t.status === "REVIEWING").length
-  const quotedCount = initialTrips.filter(t => t.status === "QUOTED" || t.status === "APPROVED").length
-  const scheduledCount = initialTrips.filter(t => t.status === "SCHEDULED").length
-  const invoicedCount = initialTrips.filter(t => t.status === "INVOICED" || t.status === "PAID").length
+  const newCount = trips.filter(t => t.status === "NEW" || t.status === "REVIEWING").length
+  const quotedCount = trips.filter(t => t.status === "QUOTED" || t.status === "APPROVED").length
+  const scheduledCount = trips.filter(t => t.status === "SCHEDULED").length
+  const invoicedCount = trips.filter(t => t.status === "INVOICED" || t.status === "PAID").length
 
   const handleExecuteAction = async (action: string, payload: any) => {
     setLoadingAction(`${action}-${payload.tripId}`)
@@ -70,6 +76,40 @@ export default function CharterTripsClient({
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Action failed")
+
+      // Immediately update local trips state for fast UI feedback
+      if (action === "assign_driver_bus") {
+        const assignedDriverObj = drivers.find(d => d.id === payload.driverId) || {
+          id: payload.driverId,
+          firstName: payload.driverId === "drv_1" ? "John" : payload.driverId === "drv_2" ? "Sarah" : payload.driverId === "drv_3" ? "Robert" : "Emily",
+          lastName: payload.driverId === "drv_1" ? "Miller" : payload.driverId === "drv_2" ? "Jenkins" : payload.driverId === "drv_3" ? "Davis" : "Taylor",
+        }
+        const assignedBusObj = buses.find(b => b.id === payload.busId) || {
+          id: payload.busId,
+          busNumber: payload.busId?.replace("bus_", "") || "102",
+        }
+
+        setTrips(prev => prev.map(t => {
+          if (t.id === payload.tripId) {
+            return {
+              ...t,
+              status: t.status === "PAID" ? "PAID" : "SCHEDULED",
+              assignments: [{
+                id: `asgn_${Date.now()}`,
+                tripId: payload.tripId,
+                driverId: payload.driverId,
+                busId: payload.busId,
+                driver: assignedDriverObj,
+                bus: assignedBusObj,
+                notes: payload.notes
+              }]
+            }
+          }
+          return t
+        }))
+      } else if (action === "update_status") {
+        setTrips(prev => prev.map(t => t.id === payload.tripId ? { ...t, status: payload.status } : t))
+      }
 
       showToast("success", data.message || "Operation successful")
       setModalType(null)
@@ -187,8 +227,20 @@ export default function CharterTripsClient({
               ) : (
                 filteredTrips.map((trip) => {
                   const assignment = Array.isArray(trip.assignments) ? trip.assignments[0] : trip.assignments
-                  const assignedDriver = assignment?.driver || (assignment?.driverId ? drivers.find(d => d.id === assignment.driverId) : null)
-                  const assignedBus = assignment?.bus || (assignment?.busId ? buses.find(b => b.id === assignment.busId) : null)
+                  const assignedDriver = assignment?.driver || 
+                    (assignment?.driverId ? drivers.find((d: any) => d.id === assignment.driverId) : null) ||
+                    (assignment?.driverId ? {
+                      id: assignment.driverId,
+                      firstName: assignment.driverId === "drv_1" ? "John" : assignment.driverId === "drv_2" ? "Sarah" : assignment.driverId === "drv_3" ? "Robert" : assignment.driverId === "drv_4" ? "Emily" : "Assigned",
+                      lastName: assignment.driverId === "drv_1" ? "Miller" : assignment.driverId === "drv_2" ? "Jenkins" : assignment.driverId === "drv_3" ? "Davis" : assignment.driverId === "drv_4" ? "Taylor" : "Driver",
+                    } : null)
+
+                  const assignedBus = assignment?.bus || 
+                    (assignment?.busId ? buses.find((b: any) => b.id === assignment.busId) : null) ||
+                    (assignment?.busId ? {
+                      id: assignment.busId,
+                      busNumber: assignment.busId.replace("bus_", "")
+                    } : null)
                   const quoteObj = Array.isArray(trip.tripQuote) ? trip.tripQuote[0] : trip.tripQuote
                   const rawQuoteAmt = quoteObj?.amount ?? trip.quoteAmount ?? trip.estimatedCost
                   const numQuote = rawQuoteAmt !== undefined && rawQuoteAmt !== null ? Number(rawQuoteAmt) : NaN

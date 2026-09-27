@@ -78,8 +78,19 @@ export default async function AdminCharterTripsPage() {
     { id: "bus_108", busNumber: "108", capacity: 60 }
   ]
 
-  const activeDrivers = drivers.length > 0 ? drivers : fallbackDrivers
-  const activeBuses = buses.length > 0 ? buses : fallbackBuses
+  const activeDrivers = [...drivers]
+  for (const fb of fallbackDrivers) {
+    if (!activeDrivers.some((d: any) => d.id === fb.id)) {
+      activeDrivers.push(fb)
+    }
+  }
+
+  const activeBuses = [...buses]
+  for (const fb of fallbackBuses) {
+    if (!activeBuses.some((b: any) => b.id === fb.id)) {
+      activeBuses.push(fb)
+    }
+  }
 
   return (
     <CharterTripsClient 
