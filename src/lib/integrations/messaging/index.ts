@@ -6,6 +6,7 @@
 
 export interface MessagePayload {
   to: string;         // phone or email
+  cc?: string | string[];
   from?: string;
   subject?: string;   // for email
   body: string;
@@ -79,23 +80,30 @@ class ResendProvider implements MessagingProvider {
       return { success: true, externalId: "mock_email_" + Date.now() };
     }
 
-    const defaultFrom = process.env.EMAIL_FROM || "noreply@toolsforyou.site";
+    const defaultFrom = process.env.EMAIL_FROM || "Info@eaglebusservice.com";
     let fromAddress = payload.from || defaultFrom;
 
     try {
+      const emailBody: any = {
+        from: fromAddress,
+        to: [payload.to],
+        reply_to: "Info@eaglebusservice.com",
+        subject: payload.subject || "Eagle Bus Service Notification",
+        text: payload.body,
+        html: payload.html || `<p>${payload.body}</p>`,
+      };
+
+      if (payload.cc) {
+        emailBody.cc = Array.isArray(payload.cc) ? payload.cc : [payload.cc];
+      }
+
       let res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          from: fromAddress,
-          to: [payload.to],
-          subject: payload.subject || "Eagle Bus Service Notification",
-          text: payload.body,
-          html: payload.html || `<p>${payload.body}</p>`,
-        }),
+        body: JSON.stringify(emailBody),
       });
 
       let data = await res.json();
@@ -137,8 +145,8 @@ export const messaging = {
     return smsProvider.sendSMS({ to, body });
   },
 
-  async sendEmail(to: string, subject: string, body: string, html?: string): Promise<MessageResult> {
-    return emailProvider.sendEmail({ to, subject, body, html });
+  async sendEmail(to: string, subject: string, body: string, html?: string, cc?: string | string[]): Promise<MessageResult> {
+    return emailProvider.sendEmail({ to, subject, body, html, cc });
   },
 
   async notifyDriver(

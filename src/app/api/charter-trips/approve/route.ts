@@ -248,10 +248,10 @@ async function processApproval(tripId: string) {
             </p>
           </div>
 
-          <p style="font-size: 13px; color: #64748b; line-height: 1.5;">If you have any questions regarding this invoice, please reach out to our billing team at <a href="mailto:billing@eaglebus.com" style="color: #15803d; font-weight: 600; text-decoration: none;">billing@eaglebus.com</a>.</p>
+          <p style="font-size: 13px; color: #64748b; line-height: 1.5;">If you have any questions regarding this invoice, please reach out to our team at <a href="mailto:Info@eaglebusservice.com" style="color: #15803d; font-weight: 600; text-decoration: none;">Info@eaglebusservice.com</a> or call (704) 606-5661.</p>
           
           <div style="margin-top: 24px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 18px; text-align: center;">
-            Eagle Bus Transportation • <a href="${appUrl}" style="color: #64748b; text-decoration: none;">theeaglebus.com</a>
+            Eagle Bus Service • <a href="${appUrl}" style="color: #64748b; text-decoration: none;">eaglebusconnect.com</a>
           </div>
         </div>
       </div>`;
@@ -260,7 +260,8 @@ async function processApproval(tripId: string) {
       billingEmail,
       `Invoice Ready — ${trip.organizationName} Charter Trip (${invNumber})`,
       `Dear ${billingName},\n\nYour invoice ${invNumber} for $${amount.toFixed(2)} is ready for the ${trip.organizationName} charter trip.\n\nPay Online Now: ${payUrl}\n\nThank you for choosing Eagle Bus!`,
-      htmlInvoiceEmail
+      htmlInvoiceEmail,
+      ["Info@eaglebusservice.com"]
     );
   } catch {}
 

@@ -608,13 +608,8 @@ export async function POST(req: Request) {
       try {
         const billingEmail = trip.billingEmail || trip.contactEmail
         const billingName = trip.billingName || trip.organizationName
-        const isSandbox = (process.env.QUICKBOOKS_ENVIRONMENT || "sandbox") === "sandbox"
-        const qbHost = isSandbox ? "sandbox.qbo.intuit.com" : "qbo.intuit.com"
-        const qbInvoiceUrl = qbInvoiceId
-          ? `https://${qbHost}/app/invoice?txnId=${qbInvoiceId}`
-          : `https://${qbHost}`
-
         const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://eaglebusconnect.com").replace(/\/$/, "")
+        const payUrl = `${appUrl}/pay/charter/${invNumber}`
 
         const htmlInvoiceEmail = `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
@@ -653,23 +648,23 @@ export async function POST(req: Request) {
                 </table>
               </div>
 
-              <!-- Action Button to QuickBooks -->
+              <!-- Direct Payment Button -->
               <div style="margin: 28px 0; text-align: center;">
-                <a href="${qbInvoiceUrl}" target="_blank" style="display: inline-block; background: #2ca01c; color: #ffffff; font-weight: 700; padding: 14px 28px; border-radius: 10px; text-decoration: none; font-size: 15px; box-shadow: 0 4px 10px rgba(44,160,28,0.3);">
-                  💳 View & Pay Invoice in QuickBooks
+                <a href="${payUrl}" style="display: inline-block; background: #2ca01c; color: #ffffff; font-weight: 700; padding: 16px 32px; border-radius: 10px; text-decoration: none; font-size: 16px; box-shadow: 0 4px 12px rgba(44,160,28,0.3);">
+                  💳 Pay Invoice Online ($${amount.toFixed(2)})
                 </a>
               </div>
 
               <div style="background: #f8fafc; border-left: 4px solid #2ca01c; padding: 14px 16px; border-radius: 6px; margin-bottom: 24px;">
                 <p style="margin: 0; font-size: 13px; color: #334155; line-height: 1.5;">
-                  <strong>QuickBooks Payment:</strong> Click the green button above to view your full QuickBooks invoice statement and complete payment online.
+                  <strong>Fast Online Payment:</strong> Click the green button above to view your full invoice statement and pay instantly using Credit Card, Debit, or Apple Pay with zero login required.
                 </p>
               </div>
 
-              <p style="font-size: 13px; color: #64748b; line-height: 1.5;">If you have any questions regarding this invoice, please reach out to our billing team at <a href="mailto:billing@eaglebus.com" style="color: #15803d; font-weight: 600; text-decoration: none;">billing@eaglebus.com</a>.</p>
+              <p style="font-size: 13px; color: #64748b; line-height: 1.5;">If you have any questions regarding this invoice, please reach out to our team at <a href="mailto:Info@eaglebusservice.com" style="color: #15803d; font-weight: 600; text-decoration: none;">Info@eaglebusservice.com</a> or call (704) 606-5661.</p>
               
               <div style="margin-top: 24px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 18px; text-align: center;">
-                Eagle Bus Transportation • <a href="${appUrl}" style="color: #64748b; text-decoration: none;">theeaglebus.com</a>
+                Eagle Bus Service • <a href="${appUrl}" style="color: #64748b; text-decoration: none;">eaglebusconnect.com</a>
               </div>
             </div>
           </div>`
@@ -677,8 +672,9 @@ export async function POST(req: Request) {
         await messagingService.sendEmail(
           billingEmail,
           `Invoice Ready — ${trip.organizationName} Charter Trip (${invNumber})`,
-          `Dear ${billingName},\n\nYour invoice ${invNumber} for $${amount.toFixed(2)} is ready for the ${trip.organizationName} charter trip.\n\nView & Pay in QuickBooks: ${qbInvoiceUrl}\n\nThank you for choosing Eagle Bus!`,
-          htmlInvoiceEmail
+          `Dear ${billingName},\n\nYour invoice ${invNumber} for $${amount.toFixed(2)} is ready for the ${trip.organizationName} charter trip.\n\nPay Online Now: ${payUrl}\n\nThank you for choosing Eagle Bus!`,
+          htmlInvoiceEmail,
+          ["Info@eaglebusservice.com"]
         )
       } catch (invoiceEmailErr) {
         console.warn("[CHARTER_TRIPS_POST] Invoice email send failed (non-blocking):", invoiceEmailErr)
@@ -686,8 +682,142 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        message: "QuickBooks Invoice generated. Billing contact emailed.",
+        message: "Invoice generated. Billing contact emailed and copy sent to Info@eaglebusservice.com.",
         invoice: invoicePayload
+      })
+    }
+
+    // Action 3.5: Adjust Post-Trip Invoice
+    if (action === "adjust_invoice") {
+      const { newAmount, adjustmentNotes } = body
+      if (!newAmount || isNaN(Number(newAmount))) {
+        return NextResponse.json({ error: "Valid new amount is required" }, { status: 400 })
+      }
+
+      const numAmount = Number(newAmount)
+
+      // Find existing invoice or create one
+      let invoice: any = null
+      try {
+        invoice = await db.invoice.findFirst({ where: { charterTripId: tripId } })
+        if (invoice) {
+          await db.invoice.update({
+            where: { id: invoice.id },
+            data: {
+              amount: numAmount,
+              totalAmount: numAmount,
+              notes: adjustmentNotes || invoice.notes,
+              status: "SENT",
+            }
+          })
+        }
+      } catch (dbErr) {
+        console.warn("[CHARTER_TRIPS_POST] Prisma invoice update failed:", dbErr)
+      }
+
+      const invNumber = invoice?.invoiceNumber || `INV-CHARTER-${Date.now().toString().slice(-5)}`
+
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/invoices?charterTripId=eq.${tripId}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              amount: numAmount,
+              totalAmount: numAmount,
+              notes: adjustmentNotes || null,
+              status: 'SENT',
+              updatedAt: new Date().toISOString()
+            })
+          })
+        } catch {}
+      }
+
+      try {
+        await db.charterTrip.update({
+          where: { id: tripId },
+          data: { status: "INVOICED" }
+        })
+      } catch {}
+
+      // Email adjusted invoice to billing contact & CC Info@eaglebusservice.com
+      try {
+        const billingEmail = trip.billingEmail || trip.contactEmail
+        const billingName = trip.billingName || trip.organizationName
+        const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://eaglebusconnect.com").replace(/\/$/, "")
+        const payUrl = `${appUrl}/pay/charter/${invNumber}`
+
+        const htmlAdjustedInvoiceEmail = `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+            <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; padding: 28px 24px; text-align: left;">
+              <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 700; margin-bottom: 4px;">Eagle Bus Transportation</div>
+              <h2 style="margin: 0; font-size: 24px; font-weight: 800;">Updated Charter Invoice</h2>
+            </div>
+            
+            <div style="padding: 28px 24px; background: #ffffff; color: #1e293b;">
+              <p style="font-size: 16px; margin-top: 0; color: #0f172a;">Dear <strong>${billingName}</strong>,</p>
+              <p style="font-size: 14px; color: #475569; line-height: 1.6;">Your invoice for <strong>${trip.organizationName}</strong> has been updated following your trip.</p>
+              
+              ${adjustmentNotes ? `
+              <div style="background: #f0f9ff; border-left: 4px solid #0284c7; padding: 12px 16px; border-radius: 6px; margin: 16px 0; font-size: 13px; color: #0369a1;">
+                <strong>Adjustment Notes:</strong> ${adjustmentNotes}
+              </div>` : ''}
+
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="font-size: 12px; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Invoice #</td>
+                    <td style="font-size: 12px; color: #15803d; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; text-align: right;">Organization</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 18px; font-weight: 800; color: #166534; padding-top: 2px;">${invNumber}</td>
+                    <td style="font-size: 15px; font-weight: 700; color: #1e293b; text-align: right; padding-top: 2px;">${trip.organizationName}</td>
+                  </tr>
+                </table>
+                
+                <hr style="border: 0; border-top: 1px dashed #86efac; margin: 16px 0;" />
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="font-size: 13px; color: #15803d; font-weight: 600;">Updated Total Amount Due</td>
+                    <td style="font-size: 26px; font-weight: 900; color: #166534; text-align: right;">$${numAmount.toFixed(2)}</td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Direct Payment Button -->
+              <div style="margin: 28px 0; text-align: center;">
+                <a href="${payUrl}" style="display: inline-block; background: #0284c7; color: #ffffff; font-weight: 700; padding: 16px 32px; border-radius: 10px; text-decoration: none; font-size: 16px; box-shadow: 0 4px 12px rgba(2,132,199,0.3);">
+                  💳 Pay Updated Invoice Online ($${numAmount.toFixed(2)})
+                </a>
+              </div>
+
+              <p style="font-size: 13px; color: #64748b; line-height: 1.5;">If you have any questions regarding this invoice update, please reach out to our team at <a href="mailto:Info@eaglebusservice.com" style="color: #0284c7; font-weight: 600; text-decoration: none;">Info@eaglebusservice.com</a> or call (704) 606-5661.</p>
+              
+              <div style="margin-top: 24px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 18px; text-align: center;">
+                Eagle Bus Service • <a href="${appUrl}" style="color: #64748b; text-decoration: none;">eaglebusconnect.com</a>
+              </div>
+            </div>
+          </div>`
+
+        await messagingService.sendEmail(
+          billingEmail,
+          `Updated Invoice — ${trip.organizationName} Charter Trip (${invNumber})`,
+          `Dear ${billingName},\n\nYour updated invoice ${invNumber} for $${numAmount.toFixed(2)} is ready.\n\nPay Online Now: ${payUrl}\n\nThank you for choosing Eagle Bus!`,
+          htmlAdjustedInvoiceEmail,
+          ["Info@eaglebusservice.com"]
+        )
+      } catch (invoiceEmailErr) {
+        console.warn("[CHARTER_TRIPS_POST] Adjusted invoice email send failed:", invoiceEmailErr)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Invoice adjusted to $${numAmount.toFixed(2)} and emailed to customer & Info@eaglebusservice.com.`,
       })
     }
 

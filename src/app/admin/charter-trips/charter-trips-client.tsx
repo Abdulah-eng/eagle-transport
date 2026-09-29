@@ -24,7 +24,7 @@ export default function CharterTripsClient({
   const [statusFilter, setStatusFilter] = useState("ALL")
 
   const [selectedTrip, setSelectedTrip] = useState<any>(null)
-  const [modalType, setModalType] = useState<"quote" | "assignment" | "invoice" | null>(null)
+  const [modalType, setModalType] = useState<"quote" | "assignment" | "invoice" | "adjust_invoice" | null>(null)
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
@@ -36,6 +36,10 @@ export default function CharterTripsClient({
   const [selectedDriverId, setSelectedDriverId] = useState("")
   const [selectedBusId, setSelectedBusId] = useState("")
   const [assignmentNotes, setAssignmentNotes] = useState("")
+
+  // Adjust Invoice Form State
+  const [adjustAmount, setAdjustAmount] = useState("")
+  const [adjustNotes, setAdjustNotes] = useState("")
 
   const [trips, setTrips] = useState<any[]>(initialTrips)
 
@@ -342,14 +346,28 @@ export default function CharterTripsClient({
                             </button>
                           )}
 
-                          {/* 3. QuickBooks / Invoice Status Badge */}
+                          {/* 3. QuickBooks / Invoice Status Badge & Adjust Button */}
                           {(trip.status === "INVOICED" || trip.status === "PAID" || trip.quickbooksInvoiceId) ? (
-                            <span 
-                              className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded text-xs font-bold flex items-center gap-1 cursor-default"
-                              title="Invoice has been generated and sent to customer"
-                            >
-                              <FileText className="w-3.5 h-3.5 text-purple-600" /> Invoiced
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span 
+                                className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded text-xs font-bold flex items-center gap-1 cursor-default"
+                                title="Invoice has been generated and sent to customer"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-purple-600" /> Invoiced
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setSelectedTrip(trip)
+                                  setAdjustAmount(!isNaN(numQuote) && numQuote > 0 ? String(numQuote) : "")
+                                  setAdjustNotes("")
+                                  setModalType("adjust_invoice")
+                                }}
+                                className="px-2 py-1 border border-purple-300 text-purple-700 hover:bg-purple-50 rounded text-xs font-bold transition-colors shadow-sm"
+                                title="Adjust Invoice amount or add post-trip charges"
+                              >
+                                Edit Invoice
+                              </button>
+                            </div>
                           ) : (
                             trip.status === "APPROVED" && (
                               <button
@@ -537,6 +555,71 @@ export default function CharterTripsClient({
                   className="px-4 py-2 text-sm font-bold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50"
                 >
                   Dispatch Crew & Sync Calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Adjust Post-Trip Invoice */}
+      {modalType === "adjust_invoice" && selectedTrip && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
+            <h3 className="text-lg font-bold font-heading text-foreground flex items-center gap-2">
+              <FileText className="w-5 h-5 text-purple-600" /> Adjust Post-Trip Invoice
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Adjust invoice amount or add overtime/mileage fees for <strong>{selectedTrip.organizationName}</strong>.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                  Updated Total Invoice Amount ($)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 650.00"
+                  value={adjustAmount}
+                  onChange={(e) => setAdjustAmount(e.target.value)}
+                  className="w-full p-2.5 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1">
+                  Adjustment Reason / Notes
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Added 1.5 hours overtime waiting for student assembly + $20 toll fees"
+                  value={adjustNotes}
+                  onChange={(e) => setAdjustNotes(e.target.value)}
+                  className="w-full p-2.5 bg-background border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setModalType(null)}
+                  className="px-4 py-2 text-sm font-medium border border-input rounded-lg hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!adjustAmount || loadingAction?.startsWith("adjust_invoice")}
+                  onClick={() => handleExecuteAction("adjust_invoice", {
+                    tripId: selectedTrip.id,
+                    newAmount: adjustAmount,
+                    adjustmentNotes: adjustNotes,
+                  })}
+                  className="px-4 py-2 text-sm font-bold bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                >
+                  Save & Re-Send Invoice
                 </button>
               </div>
             </div>

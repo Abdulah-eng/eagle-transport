@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { 
   Calendar, Phone, ShieldCheck, AlertCircle, CheckCircle2, 
-  Smartphone, FileText, ChevronDown, ChevronUp, Bus, ArrowLeft
+  Smartphone, FileText, ChevronDown, ChevronUp, Bus, ArrowLeft, MapPin
 } from "lucide-react"
 
 // Schema definitions
@@ -88,7 +88,40 @@ export default function IntakePage() {
     defaultValues: { serviceType: "field_trip" }
   })
 
-  // Google Places Autocomplete Integration
+  const [pickupSuggestions, setPickupSuggestions] = useState<string[]>([])
+  const [destSuggestions, setDestSuggestions] = useState<string[]>([])
+  const [showPickupDropdown, setShowPickupDropdown] = useState(false)
+  const [showDestDropdown, setShowDestDropdown] = useState(false)
+
+  const fetchAddressSuggestions = async (query: string, setSuggestions: (items: string[]) => void) => {
+    if (!query || query.trim().length < 3) {
+      setSuggestions([])
+      return
+    }
+    try {
+      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data && data.features) {
+        const items = data.features.map((f: any) => {
+          const props = f.properties || {}
+          const parts = [
+            props.name,
+            props.housenumber ? `${props.housenumber} ${props.street || ''}`.trim() : props.street,
+            props.city || props.town || props.district,
+            props.state,
+            props.postcode
+          ].filter(Boolean)
+          return parts.join(", ")
+        }).filter((v: string, idx: number, self: string[]) => v && self.indexOf(v) === idx)
+        setSuggestions(items)
+      }
+    } catch (err) {
+      console.warn("Free address autocomplete warning:", err)
+    }
+  }
+
+  // Google Places & OpenStreetMap Autocomplete Integration
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -383,10 +416,11 @@ export default function IntakePage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
+                    {/* PICKUP ADDRESS FIELD */}
+                    <div className="space-y-1.5 relative">
                       <Label htmlFor="pickupAddress" className="text-xs font-semibold flex items-center justify-between">
                         <span>Pickup Address *</span>
-                        <span className="text-[10px] text-emerald-600 font-bold">Google Maps Auto-complete</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">✨ Free Live Auto-complete</span>
                       </Label>
                       <Input 
                         id="pickupAddress" 
@@ -395,14 +429,41 @@ export default function IntakePage() {
                           register("pickupAddress").ref(e);
                           pickupInputRef.current = e;
                         }}
+                        onChange={(e) => {
+                          register("pickupAddress").onChange(e);
+                          fetchAddressSuggestions(e.target.value, setPickupSuggestions);
+                          setShowPickupDropdown(true);
+                        }}
+                        onFocus={() => setShowPickupDropdown(true)}
                         placeholder="Start typing address (e.g. 123 School Rd, Charlotte, NC)" 
+                        autoComplete="off"
                       />
+                      {showPickupDropdown && pickupSuggestions.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden divide-y divide-border">
+                          {pickupSuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onMouseDown={() => {
+                                setValue("pickupAddress", item);
+                                setShowPickupDropdown(false);
+                              }}
+                              className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{item}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {errors.pickupAddress && <p className="text-xs text-destructive">{errors.pickupAddress.message as string}</p>}
                     </div>
-                    <div className="space-y-1.5">
+
+                    {/* DESTINATION ADDRESS FIELD */}
+                    <div className="space-y-1.5 relative">
                       <Label htmlFor="destinationAddress" className="text-xs font-semibold flex items-center justify-between">
                         <span>Destination Address *</span>
-                        <span className="text-[10px] text-emerald-600 font-bold">Google Maps Auto-complete</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">✨ Free Live Auto-complete</span>
                       </Label>
                       <Input 
                         id="destinationAddress" 
@@ -411,8 +472,33 @@ export default function IntakePage() {
                           register("destinationAddress").ref(e);
                           destinationInputRef.current = e;
                         }}
+                        onChange={(e) => {
+                          register("destinationAddress").onChange(e);
+                          fetchAddressSuggestions(e.target.value, setDestSuggestions);
+                          setShowDestDropdown(true);
+                        }}
+                        onFocus={() => setShowDestDropdown(true)}
                         placeholder="Start typing destination or venue name" 
+                        autoComplete="off"
                       />
+                      {showDestDropdown && destSuggestions.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden divide-y divide-border">
+                          {destSuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onMouseDown={() => {
+                                setValue("destinationAddress", item);
+                                setShowDestDropdown(false);
+                              }}
+                              className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{item}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {errors.destinationAddress && <p className="text-xs text-destructive">{errors.destinationAddress.message as string}</p>}
                     </div>
                   </div>
