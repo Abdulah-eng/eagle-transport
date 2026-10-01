@@ -91,6 +91,9 @@ export default function IntakePage() {
 
   const pickupInputRef = useRef<HTMLInputElement | null>(null)
   const destinationInputRef = useRef<HTMLInputElement | null>(null)
+  const schoolStreetInputRef = useRef<HTMLInputElement | null>(null)
+  const privatePickupInputRef = useRef<HTMLInputElement | null>(null)
+  const privateDropoffInputRef = useRef<HTMLInputElement | null>(null)
 
   const getSchema = () => {
     switch (serviceType) {
@@ -105,12 +108,27 @@ export default function IntakePage() {
     defaultValues: { serviceType: "field_trip" }
   })
 
-  const [pickupSuggestions, setPickupSuggestions] = useState<string[]>([])
-  const [destSuggestions, setDestSuggestions] = useState<string[]>([])
+  interface AddressSuggestion {
+    fullAddress: string;
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+  }
+
+  const [pickupSuggestions, setPickupSuggestions] = useState<AddressSuggestion[]>([])
+  const [destSuggestions, setDestSuggestions] = useState<AddressSuggestion[]>([])
+  const [schoolStreetSuggestions, setSchoolStreetSuggestions] = useState<AddressSuggestion[]>([])
+  const [privatePickupSuggestions, setPrivatePickupSuggestions] = useState<AddressSuggestion[]>([])
+  const [privateDropoffSuggestions, setPrivateDropoffSuggestions] = useState<AddressSuggestion[]>([])
+
   const [showPickupDropdown, setShowPickupDropdown] = useState(false)
   const [showDestDropdown, setShowDestDropdown] = useState(false)
+  const [showSchoolStreetDropdown, setShowSchoolStreetDropdown] = useState(false)
+  const [showPrivatePickupDropdown, setShowPrivatePickupDropdown] = useState(false)
+  const [showPrivateDropoffDropdown, setShowPrivateDropoffDropdown] = useState(false)
 
-  const fetchAddressSuggestions = async (query: string, setSuggestions: (items: string[]) => void) => {
+  const fetchAddressSuggestions = async (query: string, setSuggestions: (items: AddressSuggestion[]) => void) => {
     if (!query || query.trim().length < 3) {
       setSuggestions([])
       return
@@ -120,17 +138,29 @@ export default function IntakePage() {
       if (!res.ok) return
       const data = await res.json()
       if (data && data.features) {
-        const items = data.features.map((f: any) => {
+        const items: AddressSuggestion[] = data.features.map((f: any) => {
           const props = f.properties || {}
-          const parts = [
-            props.name,
-            props.housenumber ? `${props.housenumber} ${props.street || ''}`.trim() : props.street,
-            props.city || props.town || props.district,
-            props.state,
-            props.postcode
-          ].filter(Boolean)
-          return parts.join(", ")
-        }).filter((v: string, idx: number, self: string[]) => v && self.indexOf(v) === idx)
+          const streetPart = props.housenumber ? `${props.housenumber} ${props.street || ''}`.trim() : (props.street || props.name || '')
+          const cityPart = props.city || props.town || props.district || ''
+          const statePart = props.state || ''
+          const zipPart = props.postcode || ''
+
+          const full = [
+            props.name && props.name !== streetPart ? props.name : null,
+            streetPart,
+            cityPart,
+            statePart,
+            zipPart
+          ].filter(Boolean).join(", ")
+
+          return {
+            fullAddress: full || query,
+            street: streetPart || props.name || query,
+            city: cityPart,
+            state: statePart,
+            zip: zipPart
+          }
+        }).filter((v: AddressSuggestion, idx: number, self: AddressSuggestion[]) => v.fullAddress && self.findIndex(x => x.fullAddress === v.fullAddress) === idx)
         setSuggestions(items)
       }
     } catch (err) {
@@ -165,6 +195,61 @@ export default function IntakePage() {
             const place = dAuto.getPlace();
             if (place?.formatted_address || place?.name) {
               setValue("destinationAddress", place.formatted_address || place.name || "");
+            }
+          });
+        }
+        if (schoolStreetInputRef.current) {
+          const sAuto = new (window as any).google.maps.places.Autocomplete(schoolStreetInputRef.current, {
+            types: ["address"],
+            componentRestrictions: { country: "us" }
+          });
+          sAuto.addListener("place_changed", () => {
+            const place = sAuto.getPlace();
+            if (place?.address_components) {
+              let streetNumber = "";
+              let route = "";
+              let city = "";
+              let state = "";
+              let zip = "";
+              for (const comp of place.address_components) {
+                const types = comp.types;
+                if (types.includes("street_number")) streetNumber = comp.long_name;
+                if (types.includes("route")) route = comp.long_name;
+                if (types.includes("locality") || types.includes("sublocality")) city = comp.long_name;
+                if (types.includes("administrative_area_level_1")) state = comp.short_name || comp.long_name;
+                if (types.includes("postal_code")) zip = comp.long_name;
+              }
+              const street = [streetNumber, route].filter(Boolean).join(" ");
+              setValue("schoolStreet", street || place.formatted_address || "");
+              if (city) setValue("schoolCity", city);
+              if (state) setValue("schoolState", state);
+              if (zip) setValue("schoolZip", zip);
+            } else if (place?.formatted_address) {
+              setValue("schoolStreet", place.formatted_address);
+            }
+          });
+        }
+        if (privatePickupInputRef.current) {
+          const ppAuto = new (window as any).google.maps.places.Autocomplete(privatePickupInputRef.current, {
+            types: ["address"],
+            componentRestrictions: { country: "us" }
+          });
+          ppAuto.addListener("place_changed", () => {
+            const place = ppAuto.getPlace();
+            if (place?.formatted_address) {
+              setValue("pickupAddress", place.formatted_address);
+            }
+          });
+        }
+        if (privateDropoffInputRef.current) {
+          const pdAuto = new (window as any).google.maps.places.Autocomplete(privateDropoffInputRef.current, {
+            types: ["establishment", "geocode"],
+            componentRestrictions: { country: "us" }
+          });
+          pdAuto.addListener("place_changed", () => {
+            const place = pdAuto.getPlace();
+            if (place?.formatted_address || place?.name) {
+              setValue("dropoffAddress", place.formatted_address || place.name || "");
             }
           });
         }
@@ -498,13 +583,13 @@ export default function IntakePage() {
                               key={idx}
                               type="button"
                               onMouseDown={() => {
-                                setValue("pickupAddress", item);
+                                setValue("pickupAddress", item.fullAddress);
                                 setShowPickupDropdown(false);
                               }}
                               className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
                             >
                               <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span className="truncate">{item}</span>
+                              <span className="truncate">{item.fullAddress}</span>
                             </button>
                           ))}
                         </div>
@@ -541,13 +626,13 @@ export default function IntakePage() {
                               key={idx}
                               type="button"
                               onMouseDown={() => {
-                                setValue("destinationAddress", item);
+                                setValue("destinationAddress", item.fullAddress);
                                 setShowDestDropdown(false);
                               }}
                               className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
                             >
                               <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span className="truncate">{item}</span>
+                              <span className="truncate">{item.fullAddress}</span>
                             </button>
                           ))}
                         </div>
@@ -666,10 +751,49 @@ export default function IntakePage() {
 
                   {/* SCHOOL ADDRESS BLOCK */}
                   <div className="space-y-3 p-4 bg-background/60 rounded-xl border border-border">
-                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">School Address *</h4>
+                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center justify-between">
+                      <span>School Address *</span>
+                      <span className="text-[10px] text-emerald-600 font-bold normal-case">✨ Free Live Auto-complete</span>
+                    </h4>
                     
-                    <div className="space-y-1.5">
-                      <Input id="schoolStreet" {...register("schoolStreet")} placeholder="Street Address *" />
+                    <div className="space-y-1.5 relative">
+                      <Input 
+                        id="schoolStreet" 
+                        {...register("schoolStreet")} 
+                        ref={(e) => {
+                          register("schoolStreet").ref(e);
+                          schoolStreetInputRef.current = e;
+                        }}
+                        onChange={(e) => {
+                          register("schoolStreet").onChange(e);
+                          fetchAddressSuggestions(e.target.value, setSchoolStreetSuggestions);
+                          setShowSchoolStreetDropdown(true);
+                        }}
+                        onFocus={() => setShowSchoolStreetDropdown(true)}
+                        placeholder="Start typing school street address (e.g. 13415 Old Statesville Rd) *" 
+                        autoComplete="off"
+                      />
+                      {showSchoolStreetDropdown && schoolStreetSuggestions.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden divide-y divide-border">
+                          {schoolStreetSuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onMouseDown={() => {
+                                setValue("schoolStreet", item.street || item.fullAddress);
+                                if (item.city) setValue("schoolCity", item.city);
+                                if (item.state) setValue("schoolState", item.state);
+                                if (item.zip) setValue("schoolZip", item.zip);
+                                setShowSchoolStreetDropdown(false);
+                              }}
+                              className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{item.fullAddress}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {errors.schoolStreet && <p className="text-xs text-destructive">{errors.schoolStreet.message as string}</p>}
                     </div>
                     
@@ -804,14 +928,89 @@ export default function IntakePage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="pickupAddress" className="text-xs font-semibold">Home Address *</Label>
-                      <Input id="pickupAddress" {...register("pickupAddress")} />
+                    {/* HOME ADDRESS */}
+                    <div className="space-y-1.5 relative">
+                      <Label htmlFor="privatePickupAddress" className="text-xs font-semibold flex items-center justify-between">
+                        <span>Home Address *</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">✨ Free Live Auto-complete</span>
+                      </Label>
+                      <Input 
+                        id="privatePickupAddress" 
+                        {...register("pickupAddress")} 
+                        ref={(e) => {
+                          register("pickupAddress").ref(e);
+                          privatePickupInputRef.current = e;
+                        }}
+                        onChange={(e) => {
+                          register("pickupAddress").onChange(e);
+                          fetchAddressSuggestions(e.target.value, setPrivatePickupSuggestions);
+                          setShowPrivatePickupDropdown(true);
+                        }}
+                        onFocus={() => setShowPrivatePickupDropdown(true)}
+                        placeholder="Start typing home address (e.g. 123 Main St, Charlotte, NC)" 
+                        autoComplete="off"
+                      />
+                      {showPrivatePickupDropdown && privatePickupSuggestions.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden divide-y divide-border">
+                          {privatePickupSuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onMouseDown={() => {
+                                setValue("pickupAddress", item.fullAddress);
+                                setShowPrivatePickupDropdown(false);
+                              }}
+                              className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{item.fullAddress}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {errors.pickupAddress && <p className="text-xs text-destructive">{errors.pickupAddress.message as string}</p>}
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="dropoffAddress" className="text-xs font-semibold">School Name / Address *</Label>
-                      <Input id="dropoffAddress" {...register("dropoffAddress")} />
+
+                    {/* SCHOOL NAME / ADDRESS */}
+                    <div className="space-y-1.5 relative">
+                      <Label htmlFor="privateDropoffAddress" className="text-xs font-semibold flex items-center justify-between">
+                        <span>School Name / Address *</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">✨ Free Live Auto-complete</span>
+                      </Label>
+                      <Input 
+                        id="privateDropoffAddress" 
+                        {...register("dropoffAddress")} 
+                        ref={(e) => {
+                          register("dropoffAddress").ref(e);
+                          privateDropoffInputRef.current = e;
+                        }}
+                        onChange={(e) => {
+                          register("dropoffAddress").onChange(e);
+                          fetchAddressSuggestions(e.target.value, setPrivateDropoffSuggestions);
+                          setShowPrivateDropoffDropdown(true);
+                        }}
+                        onFocus={() => setShowPrivateDropoffDropdown(true)}
+                        placeholder="Start typing school name or address" 
+                        autoComplete="off"
+                      />
+                      {showPrivateDropoffDropdown && privateDropoffSuggestions.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden divide-y divide-border">
+                          {privateDropoffSuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onMouseDown={() => {
+                                setValue("dropoffAddress", item.fullAddress);
+                                setShowPrivateDropoffDropdown(false);
+                              }}
+                              className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
+                            >
+                              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="truncate">{item.fullAddress}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {errors.dropoffAddress && <p className="text-xs text-destructive">{errors.dropoffAddress.message as string}</p>}
                     </div>
                   </div>
