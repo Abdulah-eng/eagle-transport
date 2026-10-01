@@ -43,7 +43,8 @@ function parseSafeTime(dateStr: any, timeStr: any): Date | null {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json().catch(() => ({}));
-    const { serviceType, contactName, contactEmail, contactPhone } = data;
+    const contactName = data.contactName || `${data.contactFirstName || ''} ${data.contactLastName || ''}`.trim();
+    const { serviceType, contactEmail, contactPhone } = data;
 
     if (!serviceType || !contactName || !contactEmail) {
       return NextResponse.json({ error: "Missing required contact fields" }, { status: 400 });

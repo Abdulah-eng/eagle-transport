@@ -21,7 +21,9 @@ const serviceTypeSchema = z.enum(["field_trip", "school_transport", "private_pay
 
 const baseSchema = z.object({
   serviceType: serviceTypeSchema,
-  contactName: z.string().min(2, "Name is required"),
+  contactFirstName: z.string().min(1, "First Name is required"),
+  contactLastName: z.string().min(1, "Last Name is required"),
+  contactName: z.string().optional(),
   contactEmail: z.string().email("Invalid email"),
   contactPhone: z.string().min(10, "Phone number is required"),
 })
@@ -185,10 +187,15 @@ export default function IntakePage() {
     setIsSubmitting(true)
     setErrorMessage("")
     try {
+      const contactName = `${data.contactFirstName || ''} ${data.contactLastName || ''}`.trim()
+      const payload = {
+        ...data,
+        contactName: contactName || data.contactName
+      }
       const res = await fetch("/api/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       })
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || "Submission failed")
@@ -382,19 +389,50 @@ export default function IntakePage() {
               {/* CONTACT INFORMATION BLOCK */}
               <div className="space-y-4 bg-muted/20 p-6 rounded-2xl border border-border">
                 <h3 className="text-base font-bold text-foreground border-b border-border pb-2">Primary Contact Information</h3>
+                
+                {/* JotForm standard side-by-side Name field */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">
+                    Name <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Input
+                        id="contactFirstName"
+                        {...register("contactFirstName")}
+                        placeholder="First Name"
+                        aria-invalid={!!errors.contactFirstName}
+                        className={errors.contactFirstName ? "border-destructive focus-visible:ring-destructive" : ""}
+                      />
+                      <span className="text-[11px] text-muted-foreground block">First Name</span>
+                      {errors.contactFirstName && (
+                        <p className="text-xs text-destructive mt-0.5">{errors.contactFirstName.message as string}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <Input
+                        id="contactLastName"
+                        {...register("contactLastName")}
+                        placeholder="Last Name"
+                        aria-invalid={!!errors.contactLastName}
+                        className={errors.contactLastName ? "border-destructive focus-visible:ring-destructive" : ""}
+                      />
+                      <span className="text-[11px] text-muted-foreground block">Last Name</span>
+                      {errors.contactLastName && (
+                        <p className="text-xs text-destructive mt-0.5">{errors.contactLastName.message as string}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="contactName" className="text-xs font-semibold">Full Name *</Label>
-                    <Input id="contactName" {...register("contactName")} placeholder="Jane Doe" />
-                    {errors.contactName && <p className="text-xs text-destructive">{errors.contactName.message as string}</p>}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="contactPhone" className="text-xs font-semibold">Phone Number *</Label>
+                    <Label htmlFor="contactPhone" className="text-xs font-semibold">Phone Number <span className="text-destructive">*</span></Label>
                     <Input id="contactPhone" {...register("contactPhone")} placeholder="(704) 606-5661" />
                     {errors.contactPhone && <p className="text-xs text-destructive">{errors.contactPhone.message as string}</p>}
                   </div>
-                  <div className="space-y-1.5 md:col-span-2">
-                    <Label htmlFor="contactEmail" className="text-xs font-semibold">Email Address *</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="contactEmail" className="text-xs font-semibold">Email Address <span className="text-destructive">*</span></Label>
                     <Input id="contactEmail" type="email" {...register("contactEmail")} placeholder="email@example.com" />
                     <p className="text-[11px] text-muted-foreground">Your email will be used for confirmation purposes only.</p>
                     {errors.contactEmail && <p className="text-xs text-destructive">{errors.contactEmail.message as string}</p>}
