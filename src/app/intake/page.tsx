@@ -46,13 +46,28 @@ const fieldTripSchema = baseSchema.extend({
 
 const schoolTransportSchema = baseSchema.extend({
   serviceType: z.literal("school_transport"),
-  schoolCode: z.string().min(3, "School code is required"),
-  studentFirstName: z.string().min(2, "Student first name is required"),
-  studentLastName: z.string().min(2, "Student last name is required"),
-  grade: z.string().min(1, "Grade is required"),
-  serviceNeeded: z.enum(["AM", "PM", "BOTH"]),
-  agreeCellPhonePolicy: z.boolean().refine(val => val === true, "You must agree to the Cell Phone Policy"),
-  agreeReleasePolicy: z.boolean().refine(val => val === true, "You must agree to the Student Release Policy"),
+  title: z.string().optional(),
+  preferredContactMethod: z.enum(["Phone", "Email", "Either"]).optional(),
+  preferredBusService: z.enum(["Daily AM & PM Routes", "Daily PM Only Routes", "Daily After-school Transport"]).default("Daily AM & PM Routes"),
+  schoolName: z.string().min(2, "School name is required"),
+  schoolStreet: z.string().min(3, "Street address is required"),
+  schoolStreet2: z.string().optional(),
+  schoolCity: z.string().min(2, "City is required"),
+  schoolState: z.string().min(2, "State is required"),
+  schoolZip: z.string().min(3, "Zip code is required"),
+  schoolCountry: z.string().default("United States"),
+  serviceArea: z.string().optional(),
+  numberOfStudentsCategory: z.enum(["Less than 50", "50 - 100", "100 - 200", "200 - 300", "Greater than 300"]).default("50 - 100"),
+  academicSchoolDays: z.number().optional(),
+  firstDayOfSchool: z.string().min(1, "First day of school is required"),
+  lastDayOfSchool: z.string().optional(),
+  amBellTime: z.string().optional(),
+  amBusArrivalTime: z.string().optional(),
+  pmBellTime: z.string().optional(),
+  pmBusArrivalTime: z.string().optional(),
+  hasOwnBuses: z.enum(["Yes", "No"]).optional(),
+  ownBusesCount: z.number().optional(),
+  comments: z.string().optional(),
 })
 
 const privatePaySchema = baseSchema.extend({
@@ -558,100 +573,172 @@ export default function IntakePage() {
                 </div>
               )}
 
-              {/* SCHOOL TRANSPORT FORM SPECIFICS */}
+              {/* SCHOOL TRANSPORT / CHARTER SCHOOL DAILY BUS SERVICE RFQ (JotForm 201346331522140) */}
               {serviceType === "school_transport" && (
                 <div className="space-y-6 bg-secondary/10 p-6 rounded-2xl border border-secondary/20">
-                  <h3 className="text-base font-bold text-secondary-foreground border-b border-secondary/30 pb-2">Lake Norman Charter / School Registration</h3>
-                  
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-900 dark:text-amber-200">
-                    <strong>LNC Middle School Note:</strong> Buses will NOT service LNC Middle School at 12435 Old Statesville Rd on morning routes (afternoon PM routes only). Allow 48 hours for request processing.
+                  <div className="border-b border-secondary/30 pb-3">
+                    <h3 className="text-lg font-bold text-secondary-foreground font-heading">
+                      Request for Quote — Charter School Daily Bus Service
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Please take a moment to fill out the charter school daily transportation request form.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="title" className="text-xs font-semibold">Job Title / Role</Label>
+                      <Input id="title" {...register("title")} placeholder="e.g. Principal / Transportation Director" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="preferredContactMethod" className="text-xs font-semibold">Preferred Method of Contact *</Label>
+                      <select 
+                        id="preferredContactMethod" 
+                        {...register("preferredContactMethod")}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      >
+                        <option value="Phone">Phone</option>
+                        <option value="Email">Email</option>
+                        <option value="Either">Either</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="preferredBusService" className="text-xs font-semibold">Preferred Type of Bus Service *</Label>
+                      <select 
+                        id="preferredBusService" 
+                        {...register("preferredBusService")}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      >
+                        <option value="Daily AM & PM Routes">Daily AM & PM Routes</option>
+                        <option value="Daily PM Only Routes">Daily PM Only Routes</option>
+                        <option value="Daily After-school Transport">Daily After-school Transport</option>
+                      </select>
+                      {errors.preferredBusService && <p className="text-xs text-destructive">{errors.preferredBusService.message as string}</p>}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="schoolName" className="text-xs font-semibold">Name of School or Program *</Label>
+                      <Input id="schoolName" {...register("schoolName")} placeholder="e.g. Lake Norman Charter School" />
+                      {errors.schoolName && <p className="text-xs text-destructive">{errors.schoolName.message as string}</p>}
+                    </div>
+                  </div>
+
+                  {/* SCHOOL ADDRESS BLOCK */}
+                  <div className="space-y-3 p-4 bg-background/60 rounded-xl border border-border">
+                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">School Address *</h4>
+                    
+                    <div className="space-y-1.5">
+                      <Input id="schoolStreet" {...register("schoolStreet")} placeholder="Street Address *" />
+                      {errors.schoolStreet && <p className="text-xs text-destructive">{errors.schoolStreet.message as string}</p>}
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <Input id="schoolStreet2" {...register("schoolStreet2")} placeholder="Street Address Line 2 (Optional)" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Input id="schoolCity" {...register("schoolCity")} placeholder="City *" />
+                        {errors.schoolCity && <p className="text-xs text-destructive">{errors.schoolCity.message as string}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Input id="schoolState" {...register("schoolState")} placeholder="State / Province *" />
+                        {errors.schoolState && <p className="text-xs text-destructive">{errors.schoolState.message as string}</p>}
+                      </div>
+                      <div className="space-y-1">
+                        <Input id="schoolZip" {...register("schoolZip")} placeholder="Postal / Zip Code *" />
+                        {errors.schoolZip && <p className="text-xs text-destructive">{errors.schoolZip.message as string}</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="serviceArea" className="text-xs font-semibold">What is your service area?</Label>
+                      <Input id="serviceArea" {...register("serviceArea")} placeholder="e.g. Huntersville, Cornelius, Charlotte" />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="numberOfStudentsCategory" className="text-xs font-semibold">Number of Students Needing Transport *</Label>
+                      <select 
+                        id="numberOfStudentsCategory" 
+                        {...register("numberOfStudentsCategory")}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      >
+                        <option value="Less than 50">Less than 50</option>
+                        <option value="50 - 100">50 - 100</option>
+                        <option value="100 - 200">100 - 200</option>
+                        <option value="200 - 300">200 - 300</option>
+                        <option value="Greater than 300">Greater than 300</option>
+                      </select>
+                      {errors.numberOfStudentsCategory && <p className="text-xs text-destructive">{errors.numberOfStudentsCategory.message as string}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="academicSchoolDays" className="text-xs font-semibold">Number of Academic School Days</Label>
+                      <Input id="academicSchoolDays" type="number" defaultValue={180} {...register("academicSchoolDays", { valueAsNumber: true })} />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="firstDayOfSchool" className="text-xs font-semibold">First Day of School *</Label>
+                      <Input id="firstDayOfSchool" type="date" {...register("firstDayOfSchool")} />
+                      {errors.firstDayOfSchool && <p className="text-xs text-destructive">{errors.firstDayOfSchool.message as string}</p>}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="lastDayOfSchool" className="text-xs font-semibold">Last Day of School</Label>
+                      <Input id="lastDayOfSchool" type="date" {...register("lastDayOfSchool")} />
+                    </div>
+                  </div>
+
+                  {/* BELL & ARRIVAL TIMES */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-background/60 rounded-xl border border-border">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="amBellTime" className="text-xs font-semibold">AM Bell Time</Label>
+                      <Input id="amBellTime" type="time" {...register("amBellTime")} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="amBusArrivalTime" className="text-xs font-semibold">Desired AM Bus Arrival Time at School</Label>
+                      <Input id="amBusArrivalTime" type="time" {...register("amBusArrivalTime")} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pmBellTime" className="text-xs font-semibold">Dismissal PM Bell Time</Label>
+                      <Input id="pmBellTime" type="time" {...register("pmBellTime")} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pmBusArrivalTime" className="text-xs font-semibold">Desired PM Bus Arrival Time at School</Label>
+                      <Input id="pmBusArrivalTime" type="time" {...register("pmBusArrivalTime")} />
+                    </div>
+                  </div>
+
+                  {/* FLEET OWNERSHIP */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="hasOwnBuses" className="text-xs font-semibold">Do you have your own buses?</Label>
+                      <select 
+                        id="hasOwnBuses" 
+                        {...register("hasOwnBuses")}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="ownBusesCount" className="text-xs font-semibold">If so, how many buses do you have?</Label>
+                      <Input id="ownBusesCount" type="number" placeholder="0" {...register("ownBusesCount", { valueAsNumber: true })} />
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="schoolCode" className="text-xs font-semibold">School Code *</Label>
-                    <Input id="schoolCode" {...register("schoolCode")} placeholder="e.g. LNC-2026" className="uppercase" />
-                    {errors.schoolCode && <p className="text-xs text-destructive">{errors.schoolCode.message as string}</p>}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="studentFirstName" className="text-xs font-semibold">Student First Name *</Label>
-                      <Input id="studentFirstName" {...register("studentFirstName")} />
-                      {errors.studentFirstName && <p className="text-xs text-destructive">{errors.studentFirstName.message as string}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="studentLastName" className="text-xs font-semibold">Student Last Name *</Label>
-                      <Input id="studentLastName" {...register("studentLastName")} />
-                      {errors.studentLastName && <p className="text-xs text-destructive">{errors.studentLastName.message as string}</p>}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="grade" className="text-xs font-semibold">Grade Level *</Label>
-                      <select 
-                        id="grade" 
-                        {...register("grade")}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                      >
-                        <option value="">Choose Grade</option>
-                        <option value="K">Kindergarten</option>
-                        <option value="1">1st Grade</option>
-                        <option value="2">2nd Grade</option>
-                        <option value="3">3rd Grade</option>
-                        <option value="4">4th Grade</option>
-                        <option value="5">5th Grade</option>
-                        <option value="6">6th Grade</option>
-                        <option value="7">7th Grade</option>
-                        <option value="8">8th Grade</option>
-                        <option value="9">9th Grade</option>
-                        <option value="10">10th Grade</option>
-                        <option value="11">11th Grade</option>
-                        <option value="12">12th Grade</option>
-                      </select>
-                      {errors.grade && <p className="text-xs text-destructive">{errors.grade.message as string}</p>}
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="serviceNeeded" className="text-xs font-semibold">Service Needed *</Label>
-                      <select 
-                        id="serviceNeeded" 
-                        {...register("serviceNeeded")}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                      >
-                        <option value="BOTH">Round Trip ($125/mo)</option>
-                        <option value="AM">Morning Only (AM Half-Price)</option>
-                        <option value="PM">Afternoon Only (PM Half-Price)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Mandated Policy Checkboxes */}
-                  <div className="space-y-3 pt-3 border-t border-secondary/30">
-                    <div className="flex items-start gap-3">
-                      <input 
-                        type="checkbox" 
-                        id="agreeCellPhonePolicy" 
-                        {...register("agreeCellPhonePolicy")} 
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary"
-                      />
-                      <Label htmlFor="agreeCellPhonePolicy" className="text-xs text-muted-foreground leading-normal">
-                        I understand the <Link href="/rules" target="_blank" className="text-primary font-bold underline">Cell Phone Policy</Link>: Cell phones must remain inside bookbags at all times. If seen/heard, phone will be confiscated and student suspended from bus.
-                      </Label>
-                    </div>
-                    {errors.agreeCellPhonePolicy && <p className="text-xs text-destructive">{errors.agreeCellPhonePolicy.message as string}</p>}
-
-                    <div className="flex items-start gap-3">
-                      <input 
-                        type="checkbox" 
-                        id="agreeReleasePolicy" 
-                        {...register("agreeReleasePolicy")} 
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary"
-                      />
-                      <Label htmlFor="agreeReleasePolicy" className="text-xs text-muted-foreground leading-normal">
-                        I understand the <Link href="/rules" target="_blank" className="text-primary font-bold underline">Release Policy</Link>: K–3rd graders will not be released without an adult/older sibling at stop. Returned students incur $10/half-hour supervision fee.
-                      </Label>
-                    </div>
-                    {errors.agreeReleasePolicy && <p className="text-xs text-destructive">{errors.agreeReleasePolicy.message as string}</p>}
+                    <Label htmlFor="comments" className="text-xs font-semibold">Comments / Special Requests</Label>
+                    <Textarea id="comments" rows={3} {...register("comments")} placeholder="Specify route preferences, cluster stops, special student needs..." />
                   </div>
                 </div>
               )}

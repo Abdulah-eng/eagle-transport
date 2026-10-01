@@ -216,210 +216,154 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, tripId: activeTripId });
 
     } else if (serviceType === "school_transport") {
-      const code = (data.schoolCode || "GENERIC").trim().toUpperCase();
-      const studentFirst = data.studentFirstName || contactName.split(" ")[0] || "Student";
-      const studentLast = data.studentLastName || contactName.split(" ").slice(1).join(" ") || "Applicant";
-      
-      let school: any = null;
+      const schoolName = data.schoolName || contactName || "Charter School Client";
+      const title = data.title || "Administrator";
+      const preferredContactMethod = data.preferredContactMethod || "Email";
+      const preferredBusService = data.preferredBusService || "Daily AM & PM Routes";
+      const schoolAddressStr = [data.schoolStreet, data.schoolStreet2, data.schoolCity, data.schoolState, data.schoolZip, data.schoolCountry || "US"].filter(Boolean).join(", ");
+      const serviceArea = data.serviceArea || "N/A";
+      const studentCategory = data.numberOfStudentsCategory || "50 - 100";
+      const days = Number(data.academicSchoolDays) || 180;
+      const firstDay = data.firstDayOfSchool || "TBD";
+      const lastDay = data.lastDayOfSchool || "TBD";
+      const amBell = data.amBellTime || "N/A";
+      const amArr = data.amBusArrivalTime || "N/A";
+      const pmBell = data.pmBellTime || "N/A";
+      const pmArr = data.pmBusArrivalTime || "N/A";
+      const ownBuses = data.hasOwnBuses || "No";
+      const busesCount = Number(data.ownBusesCount) || 0;
+      const comments = data.comments || "None";
+      const tripId = `rfq_${Date.now()}`;
+
+      // Save to Charter Trips database
       try {
-        school = await prisma.school.findUnique({ 
-          where: { code },
-          include: { settings: true } 
+        await prisma.charterTrip.create({
+          data: {
+            id: tripId,
+            organizationName: schoolName,
+            contactName: contactName,
+            contactEmail: contactEmail,
+            contactPhone: contactPhone || null,
+            billingName: schoolName,
+            billingEmail: contactEmail,
+            tripDate: parseSafeDate(firstDay),
+            pickupAddress: schoolAddressStr || "Service Area TBD",
+            destinationName: schoolName,
+            destinationAddress: schoolAddressStr || "School Location TBD",
+            numberOfStudents: studentCategory === "Less than 50" ? 40 : (studentCategory === "50 - 100" ? 75 : 150),
+            numberOfBuses: busesCount > 0 ? busesCount : 2,
+            specialInstructions: `Title: ${title} | Preferred Contact: ${preferredContactMethod} | Bus Service: ${preferredBusService} | Area: ${serviceArea} | Days: ${days} | Bell AM: ${amBell}, Bus AM: ${amArr} | Bell PM: ${pmBell}, Bus PM: ${pmArr} | Own Buses: ${ownBuses} (${busesCount}) | Comments: ${comments}`,
+            tripType: "DAILY_SCHOOL_ROUTE",
+            status: "NEW"
+          }
         });
-        if (!school) {
-          school = await prisma.school.create({
-            data: { name: `School (${code})`, code },
-            include: { settings: true }
-          });
-        }
       } catch (dbErr) {
-        console.warn("[INTAKE_API] Prisma school lookup failed, trying Supabase REST fallback:", dbErr);
+        console.warn("[INTAKE_API] Charter School RFQ Prisma create failed, trying Supabase fallback:", dbErr);
       }
 
-      const schoolId = school?.id || `sch_${code.toLowerCase()}`;
-      const maxCapacity = school?.settings?.maxCapacityPerBus || 60;
-
-      let currentApprovedCount = 0;
-      try {
-        currentApprovedCount = await prisma.registration.count({
-          where: {
-            schoolId: schoolId,
-            status: { in: ["APPROVED", "PENDING_REVIEW"] }
-          }
-        });
-      } catch {}
-
-      const initialStatus = currentApprovedCount >= maxCapacity ? "WAITLISTED" : "PENDING_REVIEW";
-      const initialPaymentStatus = initialStatus === "WAITLISTED" ? "WAITLISTED" : "PENDING_PAYMENT";
-
-      let userId = `usr_${Date.now()}`;
-      let parentId = `prt_${Date.now()}`;
-      let studentId = `std_${Date.now()}`;
-      let regId = `reg_${Date.now()}`;
-
-      try {
-        let user = await prisma.user.findUnique({
-          where: { email: contactEmail },
-          include: { parent: true }
-        });
-
-        if (!user) {
-          user = await prisma.user.create({
-            data: {
-              id: userId,
-              email: contactEmail,
-              name: contactName,
-              role: "PARENT",
-              parent: {
-                create: {
-                  id: parentId,
-                  firstName: contactName.split(" ")[0] || "Unknown",
-                  lastName: contactName.split(" ").slice(1).join(" ") || "Unknown",
-                  email: contactEmail,
-                  phone1: contactPhone || null,
-                }
-              }
-            },
-            include: { parent: true }
-          });
-          parentId = user.parent?.id || parentId;
-        } else if (!user.parent) {
-          const parent = await prisma.parent.create({
-            data: {
-              id: parentId,
-              userId: user.id,
-              firstName: contactName.split(" ")[0] || "Unknown",
-              lastName: contactName.split(" ").slice(1).join(" ") || "Unknown",
-              email: contactEmail,
-              phone1: contactPhone || null,
-            }
-          });
-          parentId = parent.id;
-        } else {
-          parentId = user.parent.id;
-        }
-
-        const student = await prisma.student.create({
-          data: {
-            id: studentId,
-            parentId: parentId,
-            schoolId: schoolId,
-            firstName: studentFirst,
-            lastName: studentLast,
-            grade: data.grade || null,
-          }
-        });
-        studentId = student.id;
-
-        const serviceTypeVal = data.serviceNeeded === "BOTH" ? "AM_AND_PM" : (data.serviceNeeded === "AM" ? "AM_ONLY" : "PM_ONLY");
-        const registration = await prisma.registration.create({
-          data: {
-            id: regId,
-            studentId: studentId,
-            schoolId: schoolId,
-            schoolCode: code,
-            serviceType: serviceTypeVal,
-            status: initialStatus,
-            paymentStatus: initialPaymentStatus
-          }
-        });
-        regId = registration.id;
-      } catch (dbErr) {
-        console.warn("[INTAKE_API] Prisma school_transport pipeline failed, using Supabase REST fallback:", dbErr);
-        
-        // Supabase REST fallback for school_transport
-        if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-          try {
-            const headers = {
+      if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/charter_trips`, {
+            method: 'POST',
+            headers: {
               'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
               'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
               'Content-Type': 'application/json',
               'Prefer': 'resolution=merge-duplicates'
-            };
-            
-            // 1. School fallback
-            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/schools`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ id: schoolId, name: `School (${code})`, code, updatedAt: new Date().toISOString() })
-            });
-
-            // 2. User fallback
-            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/users`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({ id: userId, email: contactEmail, name: contactName, role: "PARENT", updatedAt: new Date().toISOString() })
-            });
-
-            // 3. Parent fallback
-            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/parents`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                id: parentId,
-                userId: userId,
-                firstName: contactName.split(" ")[0] || "Unknown",
-                lastName: contactName.split(" ").slice(1).join(" ") || "Unknown",
-                email: contactEmail,
-                phone1: contactPhone || null,
-                updatedAt: new Date().toISOString()
-              })
-            });
-
-            // 4. Student fallback
-            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/students`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                id: studentId,
-                parentId: parentId,
-                schoolId: schoolId,
-                firstName: studentFirst,
-                lastName: studentLast,
-                grade: data.grade || null,
-                updatedAt: new Date().toISOString()
-              })
-            });
-
-            // 5. Registration fallback
-            const serviceTypeVal = data.serviceNeeded === "BOTH" ? "AM_AND_PM" : (data.serviceNeeded === "AM" ? "AM_ONLY" : "PM_ONLY");
-            await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/registrations`, {
-              method: 'POST',
-              headers,
-              body: JSON.stringify({
-                id: regId,
-                studentId: studentId,
-                schoolId: schoolId,
-                schoolCode: code,
-                serviceType: serviceTypeVal,
-                status: initialStatus,
-                paymentStatus: initialPaymentStatus,
-                updatedAt: new Date().toISOString()
-              })
-            });
-          } catch (supaErr) {
-            console.error("[INTAKE_API] Supabase REST school_transport fallback failed:", supaErr);
-          }
-        }
+            },
+            body: JSON.stringify({
+              id: tripId,
+              organizationName: schoolName,
+              contactName: contactName,
+              contactEmail: contactEmail,
+              contactPhone: contactPhone || null,
+              billingName: schoolName,
+              billingEmail: contactEmail,
+              tripDate: parseSafeDate(firstDay).toISOString(),
+              pickupAddress: schoolAddressStr || "Service Area TBD",
+              destinationName: schoolName,
+              destinationAddress: schoolAddressStr || "School Location TBD",
+              numberOfStudents: 100,
+              numberOfBuses: 2,
+              specialInstructions: `Title: ${title} | Preferred Contact: ${preferredContactMethod} | Bus Service: ${preferredBusService} | Area: ${serviceArea} | Days: ${days} | Comments: ${comments}`,
+              tripType: "DAILY_SCHOOL_ROUTE",
+              status: "NEW",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            })
+          });
+        } catch {}
       }
 
-      // Send status email (non-blocking)
+      // Email Detailed RFQ Summary to Dispatch & Confirmation to Applicant
       try {
-        const emailSubject = initialStatus === "WAITLISTED" 
-          ? "Eagle Bus - Added to Waitlist" 
-          : "Eagle Bus - Registration Received";
-        
-        const emailBody = initialStatus === "WAITLISTED"
-          ? `Thank you for registering ${studentFirst}. Bus capacity for your requested route is currently full. Your registration has been placed on the priority waitlist.`
-          : `We have received your school transportation registration for ${studentFirst}. We will review it shortly.`;
+        const htmlRfqEmail = `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+            <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; padding: 24px; text-align: left;">
+              <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.9; font-weight: 700;">Eagle Bus Transportation</div>
+              <h2 style="margin: 4px 0 0 0; font-size: 22px; font-weight: 800;">Charter School Daily Bus Service RFQ</h2>
+            </div>
+            
+            <div style="padding: 24px; color: #1e293b;">
+              <p style="font-size: 15px; margin-top: 0;"><strong>School / Program:</strong> ${schoolName}</p>
+              
+              <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 18px; border-radius: 10px; margin: 16px 0;">
+                <h4 style="margin: 0 0 10px 0; color: #1e40af; font-size: 13px; text-transform: uppercase;">Contact Information</h4>
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                  <tr><td style="padding: 4px 0; color: #64748b; width: 40%;">Contact Name:</td><td style="padding: 4px 0; font-weight: 700;">${contactName} (${title})</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">Phone Number:</td><td style="padding: 4px 0; font-weight: 600;">${contactPhone || 'N/A'}</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">E-mail Address:</td><td style="padding: 4px 0; font-weight: 600;">${contactEmail}</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">Preferred Contact:</td><td style="padding: 4px 0; font-weight: 600;">${preferredContactMethod}</td></tr>
+                </table>
+              </div>
 
-        await messaging.sendEmail(contactEmail, emailSubject, emailBody);
-      } catch {}
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 10px; margin: 16px 0;">
+                <h4 style="margin: 0 0 10px 0; color: #0f172a; font-size: 13px; text-transform: uppercase;">Service & Route Details</h4>
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                  <tr><td style="padding: 4px 0; color: #64748b; width: 40%;">Type of Service:</td><td style="padding: 4px 0; font-weight: 700; color: #2563eb;">${preferredBusService}</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">School Address:</td><td style="padding: 4px 0; font-weight: 600;">${schoolAddressStr}</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">Service Area:</td><td style="padding: 4px 0; font-weight: 600;">${serviceArea}</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">Student Volume:</td><td style="padding: 4px 0; font-weight: 700;">${studentCategory} students</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">Academic Days:</td><td style="padding: 4px 0; font-weight: 600;">${days} days</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">First / Last Day:</td><td style="padding: 4px 0; font-weight: 600;">${firstDay} to ${lastDay}</td></tr>
+                </table>
+              </div>
+
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 18px; border-radius: 10px; margin: 16px 0;">
+                <h4 style="margin: 0 0 10px 0; color: #0f172a; font-size: 13px; text-transform: uppercase;">Bell & Bus Arrival Schedule</h4>
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                  <tr><td style="padding: 4px 0; color: #64748b; width: 40%;">AM Bell Time:</td><td style="padding: 4px 0; font-weight: 600;">${amBell} (Buses arrive: ${amArr})</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">Dismissal PM Bell:</td><td style="padding: 4px 0; font-weight: 600;">${pmBell} (Buses arrive: ${pmArr})</td></tr>
+                  <tr><td style="padding: 4px 0; color: #64748b;">Own Fleet:</td><td style="padding: 4px 0; font-weight: 600;">${ownBuses} (${busesCount} buses)</td></tr>
+                </table>
+              </div>
+
+              ${comments !== 'None' ? `
+              <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 6px; margin: 16px 0; font-size: 13px;">
+                <strong>Comments / Special Requests:</strong><br/>${comments}
+              </div>` : ''}
+
+              <div style="margin-top: 24px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 16px; text-align: center;">
+                Eagle Bus Service • <a href="https://eaglebusconnect.com" style="color: #2563eb; text-decoration: none;">eaglebusconnect.com</a>
+              </div>
+            </div>
+          </div>`;
+
+        await messaging.sendEmail(
+          contactEmail,
+          `Request Received: Charter School Daily Bus Service RFQ — ${schoolName}`,
+          `Thank you for submitting your Request for Quote for ${schoolName}. Our team will review your route schedule and contact you shortly.`,
+          htmlRfqEmail,
+          ["Info@eaglebusservice.com"]
+        );
+      } catch (mailErr) {
+        console.warn("[INTAKE_API] RFQ notification email warning:", mailErr);
+      }
 
       return NextResponse.json({ 
         success: true, 
-        registrationId: regId,
-        isWaitlisted: initialStatus === "WAITLISTED"
+        tripId: tripId,
+        message: "Request for Quote submitted successfully"
       });
 
     } else if (serviceType === "private_pay") {
