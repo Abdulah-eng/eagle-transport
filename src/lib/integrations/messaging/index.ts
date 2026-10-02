@@ -131,9 +131,78 @@ class ResendProvider implements MessagingProvider {
   }
 }
 
+// ─── Dialpad SMS Provider ───────────────────────────────────────────────────
+
+class DialpadProvider implements MessagingProvider {
+  private apiKey: string;
+  private fromNumber: string;
+
+  constructor() {
+    this.apiKey = process.env.DIALPAD_API_KEY || "";
+    this.fromNumber = process.env.DIALPAD_FROM_NUMBER || process.env.DIALPAD_PHONE_NUMBER || "";
+  }
+
+  async sendSMS(payload: MessagePayload): Promise<MessageResult> {
+    if (!this.apiKey) {
+      console.warn("[Dialpad] Missing DIALPAD_API_KEY. SMS will be mocked.");
+      console.log(`[SMS Mock] To: ${payload.to} | Body: ${payload.body}`);
+      return { success: true, externalId: "mock_dialpad_" + Date.now() };
+    }
+
+    try {
+      let formattedTo = payload.to.replace(/[^\d+]/g, '');
+      if (!formattedTo.startsWith('+')) {
+        formattedTo = formattedTo.length === 10 ? `+1${formattedTo}` : `+${formattedTo}`;
+      }
+
+      let formattedFrom = (payload.from || this.fromNumber).replace(/[^\d+]/g, '');
+      if (formattedFrom && !formattedFrom.startsWith('+')) {
+        formattedFrom = formattedFrom.length === 10 ? `+1${formattedFrom}` : `+${formattedFrom}`;
+      }
+
+      const bodyData: any = {
+        to_numbers: [formattedTo],
+        text: payload.body
+      };
+      if (formattedFrom) {
+        bodyData.from_number = formattedFrom;
+      }
+
+      const response = await fetch("https://dialpad.com/api/v2/sms", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify(bodyData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("[Dialpad SMS Error]:", data);
+        return { success: false, error: data.error?.message || data.message || "Failed to send SMS via Dialpad API" };
+      }
+
+      console.log(`[Dialpad SMS Success] ID: ${data.id || 'sent'} to ${payload.to}`);
+      return { success: true, externalId: String(data.id || Date.now()) };
+    } catch (error: any) {
+      console.error("[Dialpad SMS Exception]:", error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async sendEmail(_payload: MessagePayload): Promise<MessageResult> {
+    return { success: false, error: "DialpadProvider does not handle email" };
+  }
+}
+
 // ─── Unified Messaging Service ────────────────────────────────────────────────
 
-const smsProvider = new TwilioProvider();
+const smsProvider: MessagingProvider = process.env.DIALPAD_API_KEY 
+  ? new DialpadProvider() 
+  : new TwilioProvider();
 const emailProvider = new ResendProvider();
 
 export const messaging = {

@@ -20,6 +20,7 @@ export default async function AdminSettingsPage() {
     QUICKBOOKS_CLIENT_ID: !!process.env.QUICKBOOKS_CLIENT_ID,
     GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
     TWILIO_ACCOUNT_SID: !!process.env.TWILIO_ACCOUNT_SID,
+    DIALPAD_API_KEY: !!process.env.DIALPAD_API_KEY,
     RESEND_API_KEY: !!process.env.RESEND_API_KEY,
   }
 

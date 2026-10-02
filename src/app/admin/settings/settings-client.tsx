@@ -200,16 +200,16 @@ export default function SettingsClient({ envCheck, integrations }: SettingsClien
 
             <div className="p-3 bg-muted/20 border border-border/60 rounded-xl flex items-center justify-between">
               <div>
-                <div className="font-bold text-foreground text-sm">Twilio SMS Broadcast</div>
+                <div className="font-bold text-foreground text-sm">SMS Gateway (Dialpad / Twilio)</div>
                 <div className="text-xs text-muted-foreground">Driver dispatches & urgent parent alert SMS</div>
               </div>
               <button
-                onClick={() => handleTestIntegration("Twilio")}
-                disabled={testingConnection === "Twilio"}
+                onClick={() => handleTestIntegration("SMS")}
+                disabled={testingConnection === "SMS"}
                 className="px-3 py-1 bg-emerald-500/10 text-emerald-600 text-xs font-semibold rounded-lg hover:bg-emerald-500/20 transition-colors flex items-center gap-1"
               >
-                {testingConnection === "Twilio" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                {envCheck.TWILIO_ACCOUNT_SID ? "Connected" : "Mock Active"}
+                {testingConnection === "SMS" ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                {envCheck.DIALPAD_API_KEY ? "Dialpad Connected" : envCheck.TWILIO_ACCOUNT_SID ? "Twilio Connected" : "Mock Active"}
               </button>
             </div>
 
