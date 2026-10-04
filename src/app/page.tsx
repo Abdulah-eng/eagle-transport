@@ -99,53 +99,68 @@ export default function Home() {
 
             {/* Hero Image Showcase with Dual Fleet Photos (bus.jpeg & bus1.jpeg) */}
             <div className="lg:col-span-6 relative">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                
                 {/* Photo 1: bus.jpeg */}
-                <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 group h-[340px] sm:h-[400px]">
-                  <Image
-                    src="/bus.jpeg"
-                    alt="Eagle Bus Luxury Charter Fleet"
-                    width={600}
-                    height={600}
-                    priority
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-sm">
-                      Charter Fleet
+                <div className="space-y-2">
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/30 dark:border-white/10 bg-slate-950/90 backdrop-blur-md group aspect-[4/3] flex items-center justify-center p-1.5 transition-all hover:border-primary/50">
+                    <Image
+                      src="/bus.jpeg"
+                      alt="Eagle Bus Charter Fleet"
+                      width={800}
+                      height={600}
+                      priority
+                      className="w-full h-full object-contain rounded-2xl group-hover:scale-102 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between px-2">
+                    <span className="font-heading font-extrabold text-xs text-foreground flex items-center gap-1.5">
+                      <Bus className="w-4 h-4 text-emerald-500" /> Charter Bus Fleet
+                    </span>
+                    <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      Charter Service
                     </span>
                   </div>
                 </div>
 
-                {/* Photo 2: bus1.jpeg (Staggered offset) */}
-                <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 group h-[340px] sm:h-[400px] mt-6 sm:mt-8">
-                  <Image
-                    src="/bus1.jpeg"
-                    alt="Eagle Bus School Transportation"
-                    width={600}
-                    height={600}
-                    priority
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <span className="px-2.5 py-1 rounded-full bg-primary text-white text-[10px] font-extrabold uppercase tracking-wider shadow-sm">
-                      School Routes
+                {/* Photo 2: bus1.jpeg */}
+                <div className="space-y-2">
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/30 dark:border-white/10 bg-slate-950/90 backdrop-blur-md group aspect-[4/3] flex items-center justify-center p-1.5 transition-all hover:border-primary/50">
+                    <Image
+                      src="/bus1.jpeg"
+                      alt="Eagle Bus School Transportation Fleet"
+                      width={800}
+                      height={600}
+                      priority
+                      className="w-full h-full object-contain rounded-2xl group-hover:scale-102 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between px-2">
+                    <span className="font-heading font-extrabold text-xs text-foreground flex items-center gap-1.5">
+                      <GraduationCap className="w-4 h-4 text-primary" /> School Route Transport
+                    </span>
+                    <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                      Daily Routes
                     </span>
                   </div>
                 </div>
+
               </div>
 
-              {/* Floating Live Dispatch Card */}
-              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 stitch-glass px-5 py-3 rounded-2xl shadow-xl border border-white/40 dark:border-white/10 hidden sm:flex items-center gap-3 shrink-0">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shrink-0">
-                  <UserCheck className="w-5 h-5" />
+              {/* Floating Live Dispatch Badge */}
+              <div className="mt-6 stitch-glass p-3.5 rounded-2xl shadow-lg border border-white/40 dark:border-white/10 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold shrink-0 shadow-md">
+                    <UserCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-foreground">Active Eagle Bus Fleet</div>
+                    <div className="text-[11px] text-muted-foreground">Clean, air-conditioned, CDL-certified drivers • GPS Monitored</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-foreground whitespace-nowrap">Live GPS Tracking Active</div>
-                  <div className="text-[11px] text-muted-foreground whitespace-nowrap">Eagle Bus Fleet • Ready for Dispatch</div>
-                </div>
+                <span className="hidden md:inline-flex px-3 py-1 bg-emerald-500/10 text-emerald-600 text-[11px] font-bold rounded-full border border-emerald-500/20">
+                  Ready for Dispatch
+                </span>
               </div>
             </div>
 
