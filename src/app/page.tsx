@@ -97,7 +97,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Hero Image Showcase with Floating Overlays */}
+            {/* Hero Image Showcase */}
             <div className="lg:col-span-5 relative">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 group">
                 <Image
@@ -106,17 +106,8 @@ export default function Home() {
                   width={800}
                   height={500}
                   priority
-                  className="w-full h-[420px] object-cover group-hover:scale-105 transition-transform duration-700"
+                  className="w-full h-[450px] object-cover group-hover:scale-105 transition-transform duration-700"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
-                
-                <div className="absolute bottom-6 left-6 right-6 text-white space-y-1">
-                  <div className="text-xs font-bold uppercase tracking-wider text-secondary flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-secondary" /> Premium Charter & School Transport
-                  </div>
-                  <h3 className="font-heading font-bold text-lg">Eagle Bus Fleet #42 — Ready for Dispatch</h3>
-                  <p className="text-xs text-slate-300">Clean, air-conditioned, CDL-certified driver operations.</p>
-                </div>
               </div>
 
               {/* Floating Live Dispatch Card */}
@@ -126,7 +117,7 @@ export default function Home() {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-foreground">Live GPS Tracking Active</div>
-                  <div className="text-[11px] text-muted-foreground">Driver John S. • Route #R-101</div>
+                  <div className="text-[11px] text-muted-foreground">Eagle Bus Fleet • Ready for Dispatch</div>
                 </div>
               </div>
             </div>
