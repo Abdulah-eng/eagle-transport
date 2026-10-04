@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
+import Image from "next/image"
 import Footer from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { 
   Calendar, Phone, ShieldCheck, AlertCircle, CheckCircle2, 
-  Smartphone, FileText, ChevronDown, ChevronUp, Bus, ArrowLeft, MapPin
+  Smartphone, FileText, ChevronDown, ChevronUp, Bus, ArrowLeft, MapPin, Building2
 } from "lucide-react"
 
 // Schema definitions
@@ -94,6 +95,8 @@ export default function IntakePage() {
   const schoolStreetInputRef = useRef<HTMLInputElement | null>(null)
   const privatePickupInputRef = useRef<HTMLInputElement | null>(null)
   const privateDropoffInputRef = useRef<HTMLInputElement | null>(null)
+  const orgNameInputRef = useRef<HTMLInputElement | null>(null)
+  const schoolNameInputRef = useRef<HTMLInputElement | null>(null)
 
   const getSchema = () => {
     switch (serviceType) {
@@ -121,12 +124,16 @@ export default function IntakePage() {
   const [schoolStreetSuggestions, setSchoolStreetSuggestions] = useState<AddressSuggestion[]>([])
   const [privatePickupSuggestions, setPrivatePickupSuggestions] = useState<AddressSuggestion[]>([])
   const [privateDropoffSuggestions, setPrivateDropoffSuggestions] = useState<AddressSuggestion[]>([])
+  const [orgNameSuggestions, setOrgNameSuggestions] = useState<AddressSuggestion[]>([])
+  const [schoolNameSuggestions, setSchoolNameSuggestions] = useState<AddressSuggestion[]>([])
 
   const [showPickupDropdown, setShowPickupDropdown] = useState(false)
   const [showDestDropdown, setShowDestDropdown] = useState(false)
   const [showSchoolStreetDropdown, setShowSchoolStreetDropdown] = useState(false)
   const [showPrivatePickupDropdown, setShowPrivatePickupDropdown] = useState(false)
   const [showPrivateDropoffDropdown, setShowPrivateDropoffDropdown] = useState(false)
+  const [showOrgNameDropdown, setShowOrgNameDropdown] = useState(false)
+  const [showSchoolNameDropdown, setShowSchoolNameDropdown] = useState(false)
 
   const fetchAddressSuggestions = async (query: string, setSuggestions: (items: AddressSuggestion[]) => void) => {
     if (!query || query.trim().length < 3) {
@@ -134,12 +141,17 @@ export default function IntakePage() {
       return
     }
     try {
-      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`)
+      // Restrict search results strictly to United States bounding box [-125.0, 24.0, -66.0, 49.0]
+      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=6&bbox=-125.0,24.0,-66.0,49.0`)
       if (!res.ok) return
       const data = await res.json()
       if (data && data.features) {
         const items: AddressSuggestion[] = data.features.map((f: any) => {
           const props = f.properties || {}
+          const country = props.country || '';
+          if (country && !['United States', 'United States of America', 'USA', 'US'].includes(country)) {
+            return null;
+          }
           const streetPart = props.housenumber ? `${props.housenumber} ${props.street || ''}`.trim() : (props.street || props.name || '')
           const cityPart = props.city || props.town || props.district || ''
           const statePart = props.state || ''
@@ -160,7 +172,7 @@ export default function IntakePage() {
             state: statePart,
             zip: zipPart
           }
-        }).filter((v: AddressSuggestion, idx: number, self: AddressSuggestion[]) => v.fullAddress && self.findIndex(x => x.fullAddress === v.fullAddress) === idx)
+        }).filter(Boolean).filter((v: AddressSuggestion, idx: number, self: AddressSuggestion[]) => v.fullAddress && self.findIndex(x => x.fullAddress === v.fullAddress) === idx)
         setSuggestions(items)
       }
     } catch (err) {
@@ -253,6 +265,53 @@ export default function IntakePage() {
             }
           });
         }
+        if (orgNameInputRef.current) {
+          const oAuto = new (window as any).google.maps.places.Autocomplete(orgNameInputRef.current, {
+            types: ["establishment"],
+            componentRestrictions: { country: "us" }
+          });
+          oAuto.addListener("place_changed", () => {
+            const place = oAuto.getPlace();
+            if (place?.name) {
+              setValue("organizationName", place.name);
+            }
+            if (place?.formatted_address) {
+              setValue("pickupAddress", place.formatted_address);
+            }
+          });
+        }
+        if (schoolNameInputRef.current) {
+          const sNameAuto = new (window as any).google.maps.places.Autocomplete(schoolNameInputRef.current, {
+            types: ["establishment"],
+            componentRestrictions: { country: "us" }
+          });
+          sNameAuto.addListener("place_changed", () => {
+            const place = sNameAuto.getPlace();
+            if (place?.name) {
+              setValue("schoolName", place.name);
+            }
+            if (place?.address_components) {
+              let streetNumber = "";
+              let route = "";
+              let city = "";
+              let state = "";
+              let zip = "";
+              for (const comp of place.address_components) {
+                const types = comp.types;
+                if (types.includes("street_number")) streetNumber = comp.long_name;
+                if (types.includes("route")) route = comp.long_name;
+                if (types.includes("locality") || types.includes("sublocality")) city = comp.long_name;
+                if (types.includes("administrative_area_level_1")) state = comp.short_name || comp.long_name;
+                if (types.includes("postal_code")) zip = comp.long_name;
+              }
+              const street = [streetNumber, route].filter(Boolean).join(" ");
+              if (street) setValue("schoolStreet", street);
+              if (city) setValue("schoolCity", city);
+              if (state) setValue("schoolState", state);
+              if (zip) setValue("schoolZip", zip);
+            }
+          });
+        }
       }
     }
 
@@ -322,7 +381,7 @@ export default function IntakePage() {
             </CardFooter>
           </Card>
         </div>
-        <Footer />
+        <Footer hideQuickLinks={true} />
       </div>
     )
   }
@@ -334,8 +393,8 @@ export default function IntakePage() {
       <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold shadow-md">
-              <Bus className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-full overflow-hidden shadow-md bg-card border border-border flex items-center justify-center shrink-0">
+              <Image src="/logo.jpeg" alt="Eagle Bus Logo" width={40} height={40} className="w-full h-full object-cover" />
             </div>
             <div>
               <span className="font-heading font-extrabold text-lg text-foreground">Eagle Bus Service</span>
@@ -397,7 +456,7 @@ export default function IntakePage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
               {[
                 { id: "field_trip", label: "Field Trip Request", subtitle: "Elementary, Middle, High, Sports & Groups", icon: "🚌" },
-                { id: "school_transport", label: "LNC / Charter Portal", subtitle: "Daily Cluster Stop Student Transport", icon: "🏫" },
+                { id: "school_transport", label: "Charter School Service Request Portal", subtitle: "Daily Route Student Transportation", icon: "🏫" },
                 { id: "private_pay", label: "Private-Pay Parents", subtitle: "Neighborhood Cluster Group Interest", icon: "🤝" }
               ].map((type) => (
                 <button
@@ -530,9 +589,48 @@ export default function IntakePage() {
                 <div className="space-y-6 bg-primary/5 p-6 rounded-2xl border border-primary/20">
                   <h3 className="text-base font-bold text-primary border-b border-primary/20 pb-2">Field Trip & Event Details</h3>
                   
-                  <div className="space-y-1.5">
-                    <Label htmlFor="organizationName" className="text-xs font-semibold">School or Group Name *</Label>
-                    <Input id="organizationName" {...register("organizationName")} placeholder="Lake Norman Charter Band" />
+                  <div className="space-y-1.5 relative">
+                    <Label htmlFor="organizationName" className="text-xs font-semibold flex items-center justify-between">
+                      <span>School or Group Name *</span>
+                      <span className="text-[10px] text-emerald-600 font-bold">✨ Live School Search</span>
+                    </Label>
+                    <Input 
+                      id="organizationName" 
+                      {...register("organizationName")} 
+                      ref={(e) => {
+                        register("organizationName").ref(e);
+                        orgNameInputRef.current = e;
+                      }}
+                      onChange={(e) => {
+                        register("organizationName").onChange(e);
+                        fetchAddressSuggestions(e.target.value, setOrgNameSuggestions);
+                        setShowOrgNameDropdown(true);
+                      }}
+                      onFocus={() => setShowOrgNameDropdown(true)}
+                      placeholder="Start typing school or group name (e.g. Lake Norman Charter)" 
+                      autoComplete="off"
+                    />
+                    {showOrgNameDropdown && orgNameSuggestions.length > 0 && (
+                      <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden divide-y divide-border">
+                        {orgNameSuggestions.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onMouseDown={() => {
+                              setValue("organizationName", item.street || item.fullAddress);
+                              if (item.fullAddress && !pickupInputRef.current?.value) {
+                                setValue("pickupAddress", item.fullAddress);
+                              }
+                              setShowOrgNameDropdown(false);
+                            }}
+                            className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
+                          >
+                            <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="truncate">{item.fullAddress}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {errors.organizationName && <p className="text-xs text-destructive">{errors.organizationName.message as string}</p>}
                   </div>
 
@@ -701,7 +799,7 @@ export default function IntakePage() {
                 <div className="space-y-6 bg-secondary/10 p-6 rounded-2xl border border-secondary/20">
                   <div className="border-b border-secondary/30 pb-3">
                     <h3 className="text-lg font-bold text-secondary-foreground font-heading">
-                      Request for Quote — Charter School Daily Bus Service
+                      Charter School Service Request Portal — Request for Quote
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Please take a moment to fill out the charter school daily transportation request form.
@@ -742,9 +840,49 @@ export default function IntakePage() {
                       {errors.preferredBusService && <p className="text-xs text-destructive">{errors.preferredBusService.message as string}</p>}
                     </div>
 
-                    <div className="space-y-1.5">
-                      <Label htmlFor="schoolName" className="text-xs font-semibold">Name of School or Program *</Label>
-                      <Input id="schoolName" {...register("schoolName")} placeholder="e.g. Lake Norman Charter School" />
+                    <div className="space-y-1.5 relative">
+                      <Label htmlFor="schoolName" className="text-xs font-semibold flex items-center justify-between">
+                        <span>Name of School or Program *</span>
+                        <span className="text-[10px] text-emerald-600 font-bold">✨ Live School Search</span>
+                      </Label>
+                      <Input 
+                        id="schoolName" 
+                        {...register("schoolName")} 
+                        ref={(e) => {
+                          register("schoolName").ref(e);
+                          schoolNameInputRef.current = e;
+                        }}
+                        onChange={(e) => {
+                          register("schoolName").onChange(e);
+                          fetchAddressSuggestions(e.target.value, setSchoolNameSuggestions);
+                          setShowSchoolNameDropdown(true);
+                        }}
+                        onFocus={() => setShowSchoolNameDropdown(true)}
+                        placeholder="Start typing school name (e.g. Lake Norman Charter School)" 
+                        autoComplete="off"
+                      />
+                      {showSchoolNameDropdown && schoolNameSuggestions.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden divide-y divide-border">
+                          {schoolNameSuggestions.map((item, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onMouseDown={() => {
+                                setValue("schoolName", item.street || item.fullAddress);
+                                if (item.street) setValue("schoolStreet", item.street);
+                                if (item.city) setValue("schoolCity", item.city);
+                                if (item.state) setValue("schoolState", item.state);
+                                if (item.zip) setValue("schoolZip", item.zip);
+                                setShowSchoolNameDropdown(false);
+                              }}
+                              className="w-full text-left p-2.5 text-xs text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
+                            >
+                              <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                              <span className="truncate">{item.fullAddress}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {errors.schoolName && <p className="text-xs text-destructive">{errors.schoolName.message as string}</p>}
                     </div>
                   </div>
@@ -1044,7 +1182,7 @@ export default function IntakePage() {
         </Card>
       </main>
 
-      <Footer />
+      <Footer hideQuickLinks={true} />
     </div>
   )
 }

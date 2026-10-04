@@ -14,8 +14,8 @@ export default function Home() {
       <div className="fixed top-4 inset-x-0 z-50 px-4 max-w-7xl mx-auto">
         <header className="stitch-glass rounded-full px-6 h-16 flex items-center justify-between shadow-lg border border-white/30 dark:border-white/10">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-blue-600 text-white flex items-center justify-center shadow-md group-hover:scale-105 transition-transform">
-              <Bus className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-full overflow-hidden shadow-md group-hover:scale-105 transition-transform bg-card border border-border flex items-center justify-center shrink-0">
+              <Image src="/logo.jpeg" alt="Eagle Bus Logo" width={40} height={40} className="w-full h-full object-cover" />
             </div>
             <div className="flex flex-col">
               <span className="font-heading font-extrabold text-xl tracking-tight text-foreground flex items-center gap-1">
@@ -29,9 +29,9 @@ export default function Home() {
 
           <nav className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <Link href="/intake" className="hover:text-primary transition-colors">Book Field Trip</Link>
-            <Link href="/parent/dashboard" className="hover:text-primary transition-colors">Parent Portal</Link>
-            <Link href="/school-portal" className="hover:text-primary transition-colors">School Partners</Link>
-            <Link href="/admin/dashboard" className="hover:text-primary transition-colors">Eagle Ops</Link>
+            <Link href="/auth/login" className="hover:text-primary transition-colors">Parent Portal</Link>
+            <Link href="/auth/login" className="hover:text-primary transition-colors">School Partners</Link>
+            <Link href="/auth/login" className="hover:text-primary transition-colors">Eagle Ops</Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -76,7 +76,7 @@ export default function Home() {
                   <Bus className="w-5 h-5" /> Request Charter Quote
                 </Link>
                 <Link
-                  href="/parent/dashboard"
+                  href="/auth/login"
                   className="px-7 py-4 bg-card border border-border hover:bg-muted text-foreground font-bold text-sm rounded-full transition-all shadow-sm flex items-center gap-2"
                 >
                   <CreditCard className="w-5 h-5 text-secondary" /> Parent Pay Portal
@@ -101,7 +101,7 @@ export default function Home() {
             <div className="lg:col-span-5 relative">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 group">
                 <Image
-                  src="/hero-bus.jpg"
+                  src="/bus.jpeg"
                   alt="Eagle Bus Luxury Charter Fleet"
                   width={800}
                   height={500}

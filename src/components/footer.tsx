@@ -1,17 +1,22 @@
 import Link from "next/link"
-import { Bus, MapPin, Phone, Mail, Clock, Shield, FileText } from "lucide-react"
+import Image from "next/image"
+import { Bus, MapPin, Phone, Mail, Clock, Shield, FileText, Lock } from "lucide-react"
 
-export default function Footer() {
+interface FooterProps {
+  hideQuickLinks?: boolean;
+}
+
+export default function Footer({ hideQuickLinks = false }: FooterProps) {
   return (
     <footer className="border-t border-border bg-card text-card-foreground pt-14 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${hideQuickLinks ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-8`}>
           
           {/* Col 1: Brand */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold shadow-md">
-                <Bus className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-full overflow-hidden shadow-md group-hover:scale-105 transition-transform bg-card border border-border flex items-center justify-center shrink-0">
+                <Image src="/logo.jpeg" alt="Eagle Bus Logo" width={40} height={40} className="w-full h-full object-cover" />
               </div>
               <div className="flex flex-col">
                 <span className="font-heading font-extrabold text-xl text-foreground">Eagle Bus Service</span>
@@ -25,18 +30,23 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Col 2: Quick Links */}
-          <div className="space-y-3">
-            <h4 className="font-heading font-bold text-sm text-foreground uppercase tracking-wider">Quick Links</h4>
-            <ul className="space-y-2 text-xs text-muted-foreground font-medium">
-              <li><Link href="/intake" className="hover:text-primary transition-colors">Field Trip Request Form</Link></li>
-              <li><Link href="/parent/dashboard" className="hover:text-primary transition-colors">Parent Pay Portal</Link></li>
-              <li><Link href="/school-portal" className="hover:text-primary transition-colors">School Partner Portals</Link></li>
-              <li><Link href="/rules" className="hover:text-primary transition-colors">School & Group Rules</Link></li>
-              <li><Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
-              <li><Link href="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link></li>
-            </ul>
-          </div>
+          {/* Col 2: Quick Links (Hidden if hideQuickLinks is set) */}
+          {!hideQuickLinks && (
+            <div className="space-y-3">
+              <h4 className="font-heading font-bold text-sm text-foreground uppercase tracking-wider">Quick Links</h4>
+              <ul className="space-y-2 text-xs text-muted-foreground font-medium">
+                <li><Link href="/intake" className="hover:text-primary transition-colors">Field Trip & Charter Portal</Link></li>
+                <li><Link href="/rules" className="hover:text-primary transition-colors">School & Group Guidelines</Link></li>
+                <li><Link href="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
+                <li><Link href="/terms-of-service" className="hover:text-primary transition-colors">Terms of Service</Link></li>
+                <li>
+                  <Link href="/auth/login" className="text-primary font-semibold hover:underline flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-primary" /> Authorized Staff & Parent Login
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          )}
 
           {/* Col 3: Contact & Address */}
           <div className="space-y-3">
