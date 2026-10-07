@@ -821,6 +821,91 @@ export async function POST(req: Request) {
       })
     }
 
+    // Action 3.8: Approve Reschedule Request
+    if (action === "approve_reschedule") {
+      const newDate = trip.requestedTripDate ? new Date(trip.requestedTripDate) : (body.newTripDate ? new Date(body.newTripDate) : trip.tripDate)
+      
+      try {
+        await db.charterTrip.update({
+          where: { id: tripId },
+          data: {
+            tripDate: newDate,
+            status: "SCHEDULED",
+            requestedTripDate: null,
+            changeRequestNotes: null
+          }
+        })
+
+        const customerEmail = trip.billingEmail || trip.contactEmail
+        if (customerEmail) {
+          const dateStr = newDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+          await messagingService.sendEmail(
+            customerEmail,
+            `Eagle Bus — Reschedule Request Approved (${trip.organizationName})`,
+            `Your reschedule request for ${trip.organizationName} has been approved by Eagle Bus Operations. Confirmed New Date: ${dateStr}`,
+            `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <h2 style="color: #16a34a;">Your Trip Reschedule has been Approved!</h2>
+                <p>Dear ${trip.contactName},</p>
+                <p>Your reschedule request for <strong>${trip.organizationName}</strong> has been approved by Eagle Bus Operations.</p>
+                <p><strong>Confirmed New Date:</strong> ${dateStr}</p>
+                <p>Pickup Address: ${trip.pickupAddress}</p>
+                <p>Destination: ${trip.destinationAddress}</p>
+                <p style="margin-top: 20px;">Thank you for choosing Eagle Bus Transportation!</p>
+              </div>
+            `
+          ).catch(() => {})
+        }
+      } catch (err) {
+        console.warn("[CHARTER_TRIPS_POST] Approve reschedule failed:", err)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Reschedule request approved and trip date updated."
+      })
+    }
+
+    // Action 3.9: Approve Cancellation Request
+    if (action === "approve_cancellation") {
+      try {
+        await db.charterTrip.update({
+          where: { id: tripId },
+          data: {
+            status: "CANCELLED",
+            changeRequestNotes: null
+          }
+        })
+
+        // Remove assignments
+        await db.tripAssignment.deleteMany({ where: { tripId } }).catch(() => {})
+
+        const customerEmail = trip.billingEmail || trip.contactEmail
+        if (customerEmail) {
+          await messagingService.sendEmail(
+            customerEmail,
+            `Eagle Bus — Field Trip Cancellation Confirmed (${trip.organizationName})`,
+            `This email confirms that your field trip booking for ${trip.organizationName} has been cancelled per your request.`,
+            `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <h2 style="color: #dc2626;">Field Trip Cancellation Confirmed</h2>
+                <p>Dear ${trip.contactName},</p>
+                <p>This email confirms that your field trip booking for <strong>${trip.organizationName}</strong> has been cancelled per your request.</p>
+                <p>If you have any questions or wish to re-book in the future, please contact dispatch at <strong>(704) 606-5661</strong>.</p>
+              </div>
+            `
+          ).catch(() => {})
+        }
+      } catch (err) {
+        console.warn("[CHARTER_TRIPS_POST] Approve cancellation failed:", err)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Trip cancellation approved."
+      })
+    }
+
     // Action 4: General Status Update
     if (action === "update_status") {
       if (!status) {

@@ -97,43 +97,25 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Hero Image Showcase with Dual Fleet Photos (bus.jpeg & bus1.jpeg) */}
+            {/* Hero Image Showcase with Single Large Charter Fleet Photo */}
             <div className="lg:col-span-6 relative">
-              <div className="grid grid-cols-2 gap-4">
-                {/* Photo 1: bus.jpeg */}
-                <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 group h-[340px] sm:h-[400px]">
-                  <Image
-                    src="/bus.jpeg"
-                    alt="Eagle Bus Luxury Charter Fleet"
-                    width={600}
-                    height={600}
-                    priority
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-sm">
-                      Charter Fleet
-                    </span>
-                  </div>
-                </div>
-
-                {/* Photo 2: bus1.jpeg (Staggered offset) */}
-                <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 group h-[340px] sm:h-[400px] mt-6 sm:mt-8">
-                  <Image
-                    src="/bus1.jpeg"
-                    alt="Eagle Bus School Transportation"
-                    width={600}
-                    height={600}
-                    priority
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                  <div className="absolute bottom-3 left-3 right-3">
-                    <span className="px-2.5 py-1 rounded-full bg-primary text-white text-[10px] font-extrabold uppercase tracking-wider shadow-sm">
-                      School Routes
-                    </span>
-                  </div>
+              <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/20 dark:border-white/10 group h-[380px] sm:h-[460px] lg:h-[500px] bg-slate-950/40">
+                <Image
+                  src="/bus.jpeg"
+                  alt="Eagle Bus Service Fleet"
+                  width={1200}
+                  height={800}
+                  priority
+                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+                  <span className="px-3 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-extrabold uppercase tracking-wider shadow-md">
+                    Eagle Bus Charter Fleet
+                  </span>
+                  <span className="px-3 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md text-white/90 text-xs font-bold border border-white/20 shadow-md">
+                    Authorized & Insured
+                  </span>
                 </div>
               </div>
 

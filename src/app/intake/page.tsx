@@ -112,6 +112,7 @@ export default function IntakePage() {
   })
 
   interface AddressSuggestion {
+    name?: string;
     fullAddress: string;
     street: string;
     city: string;
@@ -166,6 +167,7 @@ export default function IntakePage() {
           ].filter(Boolean).join(", ")
 
           return {
+            name: props.name || streetPart || query,
             fullAddress: full || query,
             street: streetPart || props.name || query,
             city: cityPart,
@@ -617,7 +619,7 @@ export default function IntakePage() {
                             key={idx}
                             type="button"
                             onMouseDown={() => {
-                              setValue("organizationName", item.street || item.fullAddress);
+                              setValue("organizationName", item.name || item.street || item.fullAddress);
                               if (item.fullAddress && !pickupInputRef.current?.value) {
                                 setValue("pickupAddress", item.fullAddress);
                               }
@@ -868,7 +870,7 @@ export default function IntakePage() {
                               key={idx}
                               type="button"
                               onMouseDown={() => {
-                                setValue("schoolName", item.street || item.fullAddress);
+                                setValue("schoolName", item.name || item.street || item.fullAddress);
                                 if (item.street) setValue("schoolStreet", item.street);
                                 if (item.city) setValue("schoolCity", item.city);
                                 if (item.state) setValue("schoolState", item.state);

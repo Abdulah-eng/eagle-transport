@@ -202,7 +202,10 @@ export default function CharterTripsClient({
             <option value="APPROVED">Approved</option>
             <option value="SCHEDULED">Scheduled</option>
             <option value="INVOICED">Invoiced</option>
+            <option value="RESCHEDULE_REQUESTED">Reschedule Requested</option>
+            <option value="CANCELLATION_REQUESTED">Cancellation Requested</option>
             <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
       </div>
@@ -270,6 +273,16 @@ export default function CharterTripsClient({
                             Quote: ${numQuote.toFixed(2)}
                           </div>
                         )}
+                        {trip.changeRequestNotes && (
+                          <div className="mt-1.5 text-[11px] p-2 bg-amber-500/10 border border-amber-300 rounded-lg text-amber-900 dark:text-amber-300 font-medium">
+                            <span className="font-bold">Change Note:</span> {trip.changeRequestNotes}
+                            {trip.requestedTripDate && (
+                              <div className="font-bold text-amber-700 dark:text-amber-400">
+                                Proposed New Date: {new Date(trip.requestedTripDate).toLocaleDateString()}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       <td className="p-4 text-xs">
@@ -302,15 +315,44 @@ export default function CharterTripsClient({
                           trip.status === "APPROVED" ? "bg-emerald-500/10 text-emerald-700 border border-emerald-200" :
                           trip.status === "SCHEDULED" ? "bg-indigo-500/10 text-indigo-700 border border-indigo-200" :
                           trip.status === "INVOICED" ? "bg-purple-500/10 text-purple-700 border border-purple-200" :
+                          trip.status === "RESCHEDULE_REQUESTED" ? "bg-amber-500 text-slate-950 font-bold border border-amber-300 animate-pulse" :
+                          trip.status === "CANCELLATION_REQUESTED" ? "bg-rose-600 text-white font-bold border border-rose-300 animate-pulse" :
+                          trip.status === "CANCELLED" ? "bg-slate-200 text-slate-700 border border-slate-300" :
                           trip.status === "PAID" ? "bg-emerald-600 text-white" :
                           "bg-secondary text-secondary-foreground"
                         }`}>
-                          {trip.status === "APPROVED" ? "Quote Approved" : trip.status}
+                          {trip.status === "APPROVED" ? "Quote Approved" :
+                           trip.status === "RESCHEDULE_REQUESTED" ? "Reschedule Requested" :
+                           trip.status === "CANCELLATION_REQUESTED" ? "Cancellation Requested" :
+                           trip.status}
                         </span>
                       </td>
 
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          {/* 0. Reschedule / Cancellation Approval Actions */}
+                          {trip.status === "RESCHEDULE_REQUESTED" && (
+                            <button
+                              onClick={() => handleExecuteAction("approve_reschedule", { tripId: trip.id })}
+                              disabled={loadingAction === `approve_reschedule-${trip.id}`}
+                              className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                              title="Approve Customer Reschedule Request"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Approve Reschedule
+                            </button>
+                          )}
+
+                          {trip.status === "CANCELLATION_REQUESTED" && (
+                            <button
+                              onClick={() => handleExecuteAction("approve_cancellation", { tripId: trip.id })}
+                              disabled={loadingAction === `approve_cancellation-${trip.id}`}
+                              className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                              title="Approve Customer Cancellation Request"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Confirm Cancellation
+                            </button>
+                          )}
+
                           {/* 1. Quote Action (Show for NEW or QUOTED) */}
                           {(trip.status === "NEW" || trip.status === "QUOTED") && (
                             <button

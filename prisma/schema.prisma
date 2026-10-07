@@ -545,6 +545,8 @@ enum CharterTripStatus {
   INVOICED
   PAID
   SCHEDULED
+  RESCHEDULE_REQUESTED
+  CANCELLATION_REQUESTED
   COMPLETED
   CANCELLED
 }
@@ -583,6 +585,9 @@ model CharterTrip {
   calendarEventId     String? // Google Calendar event ID
   quickbooksInvoiceId String?
   reviewNotes         String?
+  requestedTripDate   DateTime?
+  requestedStagingTime DateTime?
+  changeRequestNotes  String?           @db.Text
   completedAt         DateTime?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt

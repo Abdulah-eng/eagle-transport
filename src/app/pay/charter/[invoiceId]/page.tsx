@@ -47,6 +47,15 @@ export default function CharterInvoicePayPage() {
   const [cardCvc, setCardCvc] = useState("");
   const [cardName, setCardName] = useState("");
 
+  // Change request state (Reschedule & Cancellation)
+  const [changeModal, setChangeModal] = useState<"RESCHEDULE" | "CANCEL" | null>(null);
+  const [requestedTripDate, setRequestedTripDate] = useState("");
+  const [requestedStagingTime, setRequestedStagingTime] = useState("");
+  const [changeReason, setChangeReason] = useState("");
+  const [isSubmittingChange, setIsSubmittingChange] = useState(false);
+  const [changeSuccessMsg, setChangeSuccessMsg] = useState("");
+  const [changeErrorMsg, setChangeErrorMsg] = useState("");
+
   useEffect(() => {
     if (!rawInvoiceId) return;
 
@@ -98,6 +107,40 @@ export default function CharterInvoicePayPage() {
       setError(err.message || "Payment processing failed. Please check card details.");
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleChangeRequestSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!invoice || !changeModal) return;
+
+    setIsSubmittingChange(true);
+    setChangeErrorMsg("");
+    setChangeSuccessMsg("");
+
+    try {
+      const res = await fetch("/api/charter-trips/change-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceNumber: invoice.invoiceNumber,
+          requestType: changeModal,
+          requestedTripDate: changeModal === "RESCHEDULE" ? requestedTripDate : undefined,
+          requestedStagingTime: changeModal === "RESCHEDULE" ? requestedStagingTime : undefined,
+          reason: changeReason,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to submit request.");
+
+      setChangeSuccessMsg(data.message || "Request submitted successfully.");
+      setChangeModal(null);
+      setChangeReason("");
+    } catch (err: any) {
+      setChangeErrorMsg(err.message || "Unable to submit change request.");
+    } finally {
+      setIsSubmittingChange(false);
     }
   };
 
@@ -369,7 +412,131 @@ export default function CharterInvoicePayPage() {
           </div>
         )}
 
+        {/* Trip Change / Reschedule & Cancellation Banner */}
+        <Card className="mt-8 shadow-md border border-slate-200 bg-white overflow-hidden">
+          <CardHeader className="bg-slate-900 text-white p-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-amber-400" /> Need to Reschedule or Cancel this Trip?
+                </CardTitle>
+                <CardDescription className="text-slate-300 text-xs mt-1">
+                  Submit date change or cancellation requests directly to Eagle Bus Operations.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <Button 
+                  type="button" 
+                  onClick={() => setChangeModal("RESCHEDULE")}
+                  className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-xl shadow-sm"
+                >
+                  📅 Request Reschedule
+                </Button>
+                <Button 
+                  type="button" 
+                  onClick={() => setChangeModal("CANCEL")}
+                  variant="destructive"
+                  className="font-bold text-xs px-4 py-2 rounded-xl shadow-sm"
+                >
+                  ❌ Request Cancellation
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          {changeSuccessMsg && (
+            <CardContent className="p-4 bg-emerald-50 border-t border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{changeSuccessMsg}</span>
+            </CardContent>
+          )}
+          {changeErrorMsg && (
+            <CardContent className="p-4 bg-rose-50 border-t border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+              <span>{changeErrorMsg}</span>
+            </CardContent>
+          )}
+        </Card>
+
       </main>
+
+      {/* Change Request Modal Overlay */}
+      {changeModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 relative animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-extrabold text-lg text-slate-900 flex items-center gap-2">
+                {changeModal === "RESCHEDULE" ? "📅 Request Field Trip Reschedule" : "❌ Request Trip Cancellation"}
+              </h3>
+              <button 
+                type="button" 
+                onClick={() => setChangeModal(null)} 
+                className="text-slate-400 hover:text-slate-600 font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleChangeRequestSubmit} className="space-y-4 text-xs">
+              {changeModal === "RESCHEDULE" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reqDate" className="font-semibold text-slate-800">Proposed New Date *</Label>
+                    <Input 
+                      id="reqDate" 
+                      type="date" 
+                      required 
+                      value={requestedTripDate}
+                      onChange={(e) => setRequestedTripDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reqTime" className="font-semibold text-slate-800">Proposed Staging / Pickup Time</Label>
+                    <Input 
+                      id="reqTime" 
+                      type="time" 
+                      value={requestedStagingTime}
+                      onChange={(e) => setRequestedStagingTime(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="reqReason" className="font-semibold text-slate-800">
+                  {changeModal === "RESCHEDULE" ? "Reason for Rescheduling *" : "Reason for Cancellation *"}
+                </Label>
+                <textarea 
+                  id="reqReason" 
+                  required 
+                  rows={3}
+                  value={changeReason}
+                  onChange={(e) => setChangeReason(e.target.value)}
+                  placeholder={changeModal === "RESCHEDULE" ? "Explain proposed schedule changes or rain date..." : "Explain reason for trip cancellation..."}
+                  className="w-full rounded-xl border border-slate-200 p-3 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setChangeModal(null)} 
+                  className="rounded-xl font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmittingChange}
+                  className={changeModal === "RESCHEDULE" ? "bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl" : "bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl"}
+                >
+                  {isSubmittingChange ? "Submitting Request..." : "Submit Change Request"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
